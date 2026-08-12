@@ -12,7 +12,7 @@ RAW_DATA_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX
 FINANCES_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=1688426207"
 
 # -----------------------------------------------------------------------------
-# 2. Page Configuration & Custom CSS
+# 2. Page Configuration & Custom CSS (Restoring your original sleek look)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Aura Dashboard 2026",
@@ -41,12 +41,11 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Hide any native tabs just in case */
     div[data-testid="stVerticalBlock"] > div.stTabs {
         display: none !important;
     }
 
-    /* Custom Navigation Bar matching original look */
+    /* Custom Navigation Bar matching your exact original preference */
     .custom-nav-bar {
         display: flex;
         gap: 8px;
@@ -365,20 +364,22 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Initialization & Rock-Solid URL Handing
+# 4. State Management & Streamlit Communications Bridge
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today().strftime("%Y-%m-%d")
 
-if "focus_date" not in st.session_state or not st.session_state["focus_date"]:
+if "focus_date" not in st.session_state:
     st.session_state["focus_date"] = today_default
 
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-# THE MAGIC FIX: Python detects the URL change from the double-click 
-# and programmatically forces the active_tab to "Focus" before rendering.
-if "focus_date" in st.query_params:
-    st.session_state["focus_date"] = st.query_params["focus_date"]
+# Handle incoming query parameters sent from Python navigation buttons
+query_params = st.query_params
+if "tab" in query_params:
+    st.session_state["active_tab"] = query_params["tab"]
+if "focus_date" in query_params:
+    st.session_state["focus_date"] = query_params["focus_date"]
     st.session_state["active_tab"] = "Focus"
     st.query_params.clear()
     st.rerun()
@@ -387,7 +388,7 @@ focus_date_str = st.session_state["focus_date"]
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Custom Navigation Buttons (Python-controlled)
+# 5. Render Your Original Custom Navigation Bar
 # -----------------------------------------------------------------------------
 focus_label = f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View"
 
@@ -621,13 +622,13 @@ if current_tab == "Calendar":
         }}
 
         function doubleClickDate(dateKey) {{
-            // Cleanly creates an anchor element mapped to the top-level window.
-            // This pushes the URL update, triggering Python to instantly switch state tabs.
-            const anchor = document.createElement('a');
-            anchor.href = '?focus_date=' + dateKey;
-            anchor.target = '_parent';
-            document.body.appendChild(anchor);
-            anchor.click();
+            // Bulletproof parent navigation bypassing iframe restrictions securely
+            try {{
+                const targetUrl = window.top.location.origin + window.top.location.pathname + '?focus_date=' + dateKey + '&tab=Focus';
+                window.top.location.href = targetUrl;
+            }} catch (e) {{
+                window.parent.location.href = '?focus_date=' + dateKey + '&tab=Focus';
+            }}
         }}
 
         function switchTab(tabId, btn) {{
@@ -750,6 +751,7 @@ elif current_tab == "Focus":
         st.markdown(f'<div class="cashflow-card" style="max-height: 160px; overflow-y: auto;">{summary_rows}</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
+
 
 # =============================================================================
 # TAB 3: FINANCIAL DASHBOARD
