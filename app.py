@@ -687,7 +687,7 @@ elif current_tab == "Focus":
 
     st.markdown("<div class='section-header' style='margin-top:20px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
     
-    # Render Upcoming Week Cards and vertical expanders with proper min-height padding
+    # Render Upcoming Week Cards (Days 1 to 7)
     week_cols = st.columns(7)
     for i in range(1, 8):
         future_dt = focus_date_val + datetime.timedelta(days=i)
@@ -717,8 +717,8 @@ elif current_tab == "Focus":
                 else:
                     st.markdown("<div style='color:#64748b; font-size:11px; min-height: 25px;'>No events or bills.</div>", unsafe_allow_html=True)
 
-    # Redesigned Month Overview View (Days 8 to 37) in a compact 5-per-row grid format using native markdown safely
-    st.markdown("<div class='section-header' style='margin-top:28px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
+    # Next Month Overview Header (Next 30 Days after the upcoming week, i.e., Days 8 to 37)
+    st.markdown("<div class='section-header' style='margin-top:28px;'>📅 Next Month Overview (Next 30 Days)</div>", unsafe_allow_html=True)
     
     month_events_list = []
     for i in range(8, 38):
