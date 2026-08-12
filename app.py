@@ -29,7 +29,7 @@ st.markdown("""
     }
 
     .main .block-container {
-        padding-top: 0.2rem !important;
+        padding-top: 0.4rem !important;
         padding-bottom: 0.5rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
@@ -41,29 +41,46 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Restore native st.tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px !important;
-        background-color: #11151c !important;
-        padding: 6px 8px !important;
-        border-radius: 10px !important;
-        border: 1px solid #222734 !important;
-        margin-bottom: 16px !important;
+    /* Completely hide duplicate/native Streamlit tabs wrapper so only custom nav/state is used */
+    div[data-testid="stVerticalBlock"] > div.stTabs {
+        display: none !important;
     }
 
-    .stTabs [data-baseweb="tab"] {
-        background-color: #161a22 !important;
-        border: 1px solid #2a324b !important;
-        border-radius: 8px !important;
-        padding: 8px 20px !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 14px !important;
+    /* Custom Navigation Bar matching original look */
+    .custom-nav-bar {
+        display: flex;
+        gap: 8px;
+        background-color: #11151c;
+        padding: 6px 8px;
+        border-radius: 10px;
+        border: 1px solid #222734;
+        margin-bottom: 16px;
     }
 
-    .stTabs [aria-selected="true"] {
-        background-color: #1d2433 !important;
-        border-color: #38bdf8 !important;
+    .nav-button {
+        background-color: #161a22;
+        border: 1px solid #2a324b;
+        border-radius: 8px;
+        padding: 8px 20px;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .nav-button:hover {
+        border-color: #38bdf8;
+        color: #38bdf8;
+    }
+
+    .nav-button.active {
+        background-color: #1d2433;
+        border-color: #38bdf8;
     }
 
     .section-header {
@@ -374,35 +391,60 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Initialization & Routing via Native Tabs
+# 4. State Initialization & Query Params Handling
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today().strftime("%Y-%m-%d")
 
 if "focus_date" not in st.session_state or not st.session_state["focus_date"]:
     st.session_state["focus_date"] = today_default
 
-# Handle incoming query parameters from double-clicks inside the calendar iframe
-query_date = st.query_params.get("focus_date", "")
-if query_date:
-    st.session_state["focus_date"] = query_date
+if "active_tab" not in st.session_state:
+    st.session_state["active_tab"] = "Calendar"
+
+# Capture query params for tab switching or focus date setting from JS interactions
+query_params = st.query_params
+if "tab" in query_params:
+    st.session_state["active_tab"] = query_params["tab"]
+if "focus_date" in query_params:
+    st.session_state["focus_date"] = query_params["focus_date"]
+    st.session_state["active_tab"] = "Focus"
     st.query_params.clear()
     st.rerun()
 
 focus_date_str = st.session_state["focus_date"]
+current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Native Streamlit Tabs Navigation
+# 5. Render Custom Navigation Header (Matching Original Styling & Functionality)
 # -----------------------------------------------------------------------------
-tab1, tab2, tab3 = st.tabs([
-    "📅  Calendar & Schedule",
-    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View",
-    "💰  Finances & Net Worth"
-])
+focus_label = f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View"
+
+col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
+
+with col_nav1:
+    is_cal_active = (current_tab == "Calendar")
+    if st.button("📅  Calendar & Schedule", use_container_width=True, type="primary" if is_cal_active else "secondary"):
+        st.session_state["active_tab"] = "Calendar"
+        st.rerun()
+
+with col_nav2:
+    is_focus_active = (current_tab == "Focus")
+    if st.button(focus_label, use_container_width=True, type="primary" if is_focus_active else "secondary"):
+        st.session_state["active_tab"] = "Focus"
+        st.rerun()
+
+with col_nav3:
+    is_fin_active = (current_tab == "Finances")
+    if st.button("💰  Finances & Net Worth", use_container_width=True, type="primary" if is_fin_active else "secondary"):
+        st.session_state["active_tab"] = "Finances"
+        st.rerun()
+
+st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
 # =============================================================================
 # TAB 1: CALENDAR
 # =============================================================================
-with tab1:
+if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     json_data = json.dumps(live_data)
 
@@ -610,9 +652,10 @@ with tab1:
             try {{
                 const url = new URL(window.parent.location.href);
                 url.searchParams.set('focus_date', dateKey);
+                url.searchParams.set('tab', 'Focus');
                 window.parent.location.href = url.toString();
             }} catch (e) {{
-                window.location.href = '?focus_date=' + dateKey;
+                window.location.href = '?focus_date=' + dateKey + '&tab=Focus';
             }}
         }}
 
@@ -639,7 +682,7 @@ with tab1:
 # =============================================================================
 # TAB 2: FOCUS VIEW
 # =============================================================================
-with tab2:
+elif current_tab == "Focus":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
     try:
@@ -649,7 +692,7 @@ with tab2:
         sel_dt = datetime.date.today()
         sel_formatted = sel_dt.strftime("%A, %B %d, %Y")
 
-    st.markdown(f"<div class='section-header' style='margin-top:10px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header' style='margin-top:2px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
     
     curr_data = live_data.get(focus_date_str, {"events": [], "bills": [], "status": "Working"})
     col_d1, col_d2 = st.columns(2)
@@ -679,7 +722,7 @@ with tab2:
         else:
             st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No bills due today.</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='section-header' style='margin-top:24px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header' style='margin-top:20px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
     week_cols = st.columns(7)
     
     for i in range(1, 8):
@@ -711,7 +754,7 @@ with tab2:
                 for b in f_data["bills"]:
                     st.markdown(f"<span style='color:#facc15; font-size:11px; margin-left:10px;'>• Bill: {b['title']}</span>", unsafe_allow_html=True)
 
-    st.markdown("<div class='section-header' style='margin-top:24px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header' style='margin-top:20px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
     
     month_events_summary = []
     for i in range(8, 38):
@@ -733,7 +776,7 @@ with tab2:
             </div>'''
             for item in month_events_summary
         ])
-        st.markdown(f'<div class="cashflow-card" style="max-height: 180px; overflow-y: auto;">{summary_rows}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="cashflow-card" style="max-height: 160px; overflow-y: auto;">{summary_rows}</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
 
@@ -741,7 +784,7 @@ with tab2:
 # =============================================================================
 # TAB 3: FINANCIAL DASHBOARD
 # =============================================================================
-with tab3:
+elif current_tab == "Finances":
     fin = fetch_finances_data(FINANCES_URL)
 
     if fin:
