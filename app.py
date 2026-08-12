@@ -225,7 +225,6 @@ def fetch_finances_data(finances_url):
         "assets": []
     }
 
-    # Extract direct KPI metrics from Net Worth block (Columns Q & R, rows 3-6)
     try:
         for r in range(len(df)):
             row_vals = [str(x).strip() for x in df.iloc[r].values]
@@ -300,7 +299,6 @@ def fetch_finances_data(finances_url):
         rate_val = spec["rate"]
         override_status = spec["status"]
 
-        # Scans rows 26 to 31 for account transfer balances matching goal names
         for r in range(26, min(32, len(df))):
             row_cells = [str(df.iloc[r, c]).strip() for c in range(len(df.columns))]
             for c, cell in enumerate(row_cells):
@@ -308,7 +306,6 @@ def fetch_finances_data(finances_url):
                     if c > 0 and clean_num(row_cells[c-1]) > 0:
                         bal_val = clean_num(row_cells[c-1])
 
-        # Fallback defaults if unindexed
         if g_name == "Italy" and bal_val == 0.0: bal_val = 3290.32
         if g_name == "New Zealand" and bal_val == 0.0: bal_val = 2087.98
 
@@ -690,7 +687,6 @@ elif current_tab == "Focus":
 
     st.markdown("<div class='section-header' style='margin-top:20px;'>Upcoming Week</div>", unsafe_allow_html=True)
     
-    # Render Upcoming Week Cards (Days 1 to 7)
     week_cols = st.columns(7)
     for i in range(1, 8):
         future_dt = focus_date_val + datetime.timedelta(days=i)
@@ -720,7 +716,6 @@ elif current_tab == "Focus":
                 else:
                     st.markdown("<div style='color:#64748b; font-size:11px; min-height: 25px;'>No events or bills.</div>", unsafe_allow_html=True)
 
-    # Next Month Overview Header (Next 30 Days starting right after the upcoming week: Days 8 to 37)
     st.markdown("<div class='section-header' style='margin-top:28px;'>Next Month Overview</div>", unsafe_allow_html=True)
     
     month_events_list = []
@@ -734,9 +729,8 @@ elif current_tab == "Focus":
             "bills": [b['title'] for b in m_data["bills"]]
         })
 
-    # Render full 30 days in rows of 7, with the remaining 2 days centered on the final row
     full_weeks = [month_events_list[idx:idx + 7] for idx in range(0, 28, 7)]
-    remaining_days = month_events_list[28:]  # Exactly 2 days
+    remaining_days = month_events_list[28:]
 
     for row in full_weeks:
         cols = st.columns(7)
@@ -754,7 +748,6 @@ elif current_tab == "Focus":
                 </div>
                 """, unsafe_allow_html=True)
 
-    # Center the remaining 2 days at the bottom using empty filler columns around them
     if remaining_days:
         rem_cols = st.columns(7)
         target_indices = [2, 3]
@@ -928,7 +921,7 @@ elif current_tab == "Finances":
             ])
             st.markdown(f'<div class="cashflow-card">{debt_rows}</div>', unsafe_allow_html=True)
 
-        b_col2:
+        with b_col2:
             st.markdown(f"<div class='section-header' style='margin-top:28px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</div>", unsafe_allow_html=True)
             asset_rows = "".join([
                 f'''<div class="cf-row">
