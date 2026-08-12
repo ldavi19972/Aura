@@ -628,8 +628,8 @@ if current_tab == "Calendar":
 elif current_tab == "Focus":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
-    # Force alignment with current live date dynamically
-    focus_date_val = datetime.datetime.now().date()
+    # Force alignment with local time (+10 hours UTC offset) to ensure correct current date
+    focus_date_val = (datetime.datetime.utcnow() + datetime.timedelta(hours=10)).date()
     focus_date_str = focus_date_val.strftime("%Y-%m-%d")
     sel_formatted = focus_date_val.strftime("%A, %B %d, %Y")
 
