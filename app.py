@@ -225,7 +225,6 @@ def fetch_finances_data(finances_url):
         "assets": []
     }
 
-    # Pull Net Worth block from columns Q (index 16) & R (index 17)
     try:
         fin_data["kpis"]["savings"] = clean_num(df.iloc[3, 17])
         fin_data["kpis"]["credit"] = clean_num(df.iloc[4, 17])
@@ -280,47 +279,59 @@ def fetch_finances_data(finances_url):
                 fin_data["var_budgets"].append({"item": name, "weekly": f"${wk_val:,.2f}"})
         except: pass
 
-    # Goal configurations mapped cleanly to columns K to Q (indices 10 to 16)
-    goal_specs = [
-        {"name": "Italy", "target": 7000.00, "end_date": "9-Sep-2026", "rate": 1037.50, "status": "IN PROGRESS", "goal_row": 16},
-        {"name": "New Zealand", "target": 2087.98, "end_date": "", "rate": 0.00, "status": "SAVED", "goal_row": 20}, 
-        {"name": "Adelaide", "target": 2600.00, "end_date": "30-Sep-2026", "rate": 650.00, "status": "WAITING", "goal_row": 17},
-        {"name": "Emergency Fund", "target": 9000.00, "end_date": "6-Jan-2027", "rate": 692.31, "status": "WAITING", "goal_row": 18}
-    ]
+    # Dynamically extract goals from rows 16 to 20 matching columns K (name), L (target), N (end date), P (weekly contrib), Q (status)
+    # Account transfers row mappings (Index B = 1) for the current balances
+    transfer_balance_mapping = {
+        "Holidays": 26,
+        "Italy": 27,
+        "Adelaide": 28,
+        "Emergency Fund": 29,
+        "Savings": 30
+    }
 
-    for spec in goal_specs:
-        g_name = spec["name"]
-        target_val = spec["target"]
-        end_date = spec["end_date"]
-        rate_val = spec["rate"]
-        override_status = spec["status"]
-        
-        # Pull current balance directly from Column Q (index 16) of the designated goal row
-        bal_val = clean_num(df.iloc[spec["goal_row"], 16])
+    for r in range(16, 21):
+        try:
+            g_name = str(df.iloc[r, 11]).strip() # Column K
+            if not g_name or g_name.lower() == 'nan': continue
+            
+            target_val = clean_num(df.iloc[r, 12]) # Column L
+            end_date = str(df.iloc[r, 14]).strip() if pd.notna(df.iloc[r, 14]) else "" # Column N
+            if end_date.lower() == 'nan': end_date = ""
+            
+            rate_val = clean_num(df.iloc[r, 15]) # Column P
+            status_text = str(df.iloc[r, 16]).strip() if pd.notna(df.iloc[r, 16]) else "" # Column Q
 
-        pct = int((bal_val / target_val * 100)) if target_val > 0 else 0
-        if pct > 100: pct = 100
+            # Fetch current balance dynamically from corresponding Account Transfers row
+            bal_val = 0.0
+            t_row = transfer_balance_mapping.get(g_name)
+            if t_row is not None and t_row < len(df):
+                bal_val = clean_num(df.iloc[t_row, 1]) # Column B
 
-        if override_status == "SAVED" or pct >= 100:
-            badge = "SAVED"
-            badge_class = "badge-saved"
-            color = "#4ade80"
-            details = "Target Achieved • $0/wk needed"
-        elif override_status == "WAITING":
-            badge = "WAITING"
-            badge_class = "badge-waiting"
-            color = "#facc15"
-            details = f"Target: {end_date} • Contrib: ${rate_val:,.2f}/wk" if end_date else f"Contrib: ${rate_val:,.2f}/wk"
-        else:
-            badge = "IN PROGRESS"
-            badge_class = "badge-progress"
-            color = "#38bdf8"
-            details = f"Target: {end_date} • Contrib: ${rate_val:,.2f}/wk" if end_date else f"Contrib: ${rate_val:,.2f}/wk"
+            pct = int((bal_val / target_val * 100)) if target_val > 0 else 0
+            if pct > 100: pct = 100
 
-        fin_data["goals"].append({
-            "name": g_name, "current": bal_val, "target": target_val, "pct": pct,
-            "badge": badge, "badge_class": badge_class, "color": color, "details": details
-        })
+            if status_text.upper() == "SAVED" or pct >= 100:
+                badge = "SAVED"
+                badge_class = "badge-saved"
+                color = "#4ade80"
+                details = "Target Achieved • $0/wk needed"
+            elif status_text.upper() == "WAITING":
+                badge = "WAITING"
+                badge_class = "badge-waiting"
+                color = "#facc15"
+                details = f"Target: {end_date} • Contrib: ${rate_val:,.2f}/wk" if end_date else f"Contrib: ${rate_val:,.2f}/wk"
+            else:
+                badge = "IN PROGRESS"
+                badge_class = "badge-progress"
+                color = "#38bdf8"
+                details = f"Target: {end_date} • Contrib: ${rate_val:,.2f}/wk" if end_date else f"Contrib: ${rate_val:,.2f}/wk"
+
+            fin_data["goals"].append({
+                "name": g_name, "current": bal_val, "target": target_val, "pct": pct,
+                "badge": badge, "badge_class": badge_class, "color": color, "details": details
+            })
+        except Exception:
+            pass
 
     for r in [22, 23]:
         try:
