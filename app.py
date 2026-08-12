@@ -353,7 +353,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management
+# 4. State Management with Query Parameter Bridge
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today()
 
@@ -363,14 +363,28 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
+# Listen for incoming URL query parameters sent by double-clicks or jumps from the calendar iframe
+query_params = st.query_params
+if "tab" in query_params:
+    st.session_state["active_tab"] = query_params["tab"]
+if "focus_date" in query_params:
+    try:
+        st.session_state["focus_date"] = datetime.datetime.strptime(query_params["focus_date"], "%Y-%m-%d").date()
+    except:
+        pass
+    st.query_params.clear()
+    st.rerun()
+
 focus_date_val = st.session_state["focus_date"]
 focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_val, datetime.date) else str(focus_date_val)
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Bar with Quick Date Switcher
+# 5. Render Custom Navigation Bar
 # -----------------------------------------------------------------------------
-col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 3])
+focus_label = f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View"
+
+col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
 
 with col_nav1:
     is_cal_active = (current_tab == "Calendar")
@@ -380,7 +394,7 @@ with col_nav1:
 
 with col_nav2:
     is_focus_active = (current_tab == "Focus")
-    if st.button(f"🔍  Focus View: {focus_date_str}", use_container_width=True, type="primary" if is_focus_active else "secondary"):
+    if st.button(focus_label, use_container_width=True, type="primary" if is_focus_active else "secondary"):
         st.session_state["active_tab"] = "Focus"
         st.rerun()
 
@@ -393,7 +407,7 @@ with col_nav3:
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
 # =============================================================================
-# TAB 1: CALENDAR
+# TAB 1: CALENDAR (Double-Click Bridge Enabled)
 # =============================================================================
 if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
@@ -403,17 +417,6 @@ if current_tab == "Calendar":
     today_formatted = today_date.strftime("%A, %B %d, %Y")
     today_m_idx = today_date.month - 1
     today_d_num = today_date.day
-
-    # Accessible Quick Jump Toolbar right above calendar
-    q_col1, q_col2 = st.columns([2, 5])
-    with q_col1:
-        selected_jump_date = st.date_input("Jump Focus Date to:", value=st.session_state["focus_date"], label_visibility="collapsed")
-        if selected_jump_date != st.session_state["focus_date"]:
-            st.session_state["focus_date"] = selected_jump_date
-            st.session_state["active_tab"] = "Focus"
-            st.rerun()
-    with q_col2:
-        st.markdown("<div style='font-size: 11px; color: #38bdf8; padding-top: 8px;'>💡 Select a date above and switch tabs to jump, or click any date in the grid to preview below.</div>", unsafe_allow_html=True)
 
     calendar_html = f"""
     <!DOCTYPE html>
@@ -487,7 +490,7 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date to preview schedule details below</div>
+            <div class="click-hint">💡 Single-click to preview • Double-click any date to jump straight to Focus View</div>
         </div>
     </div>
 
@@ -558,7 +561,8 @@ if current_tab == "Calendar":
                         
                         html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}} ${{pastClass}}" 
                                      id="cell-${{mIdx}}-${{d}}"
-                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
+                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)"
+                                     ondblclick="doubleClickDate('${{dateKey}}')">
                                      ${{d}}
                                </td>`;
                         currentDay++;
@@ -607,6 +611,15 @@ if current_tab == "Calendar":
                     </div>
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
+        }}
+
+        function doubleClickDate(dateKey) {{
+            try {{
+                const targetUrl = window.top.location.origin + window.top.location.pathname + '?focus_date=' + dateKey + '&tab=Focus';
+                window.top.location.href = targetUrl;
+            }} catch (e) {{
+                window.parent.location.href = '?focus_date=' + dateKey + '&tab=Focus';
+            }}
         }}
 
         function switchTab(tabId, btn) {{
