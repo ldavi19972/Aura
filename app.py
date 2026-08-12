@@ -82,6 +82,7 @@ def load_calendar_data_sheet(csv_url):
             time_val = str(row.get("Time", "")).replace("nan", "").strip()
             location_val = str(row.get("Location", "")).replace("nan", "").strip()
             category_val = str(row.get("Category", "Working")).replace("nan", "").strip()
+            amount_val = str(row.get("Amount", "")).replace("nan", "").strip()
 
             if not category_val:
                 category_val = "Working"
@@ -89,7 +90,8 @@ def load_calendar_data_sheet(csv_url):
             if date_key not in data_map:
                 data_map[date_key] = {
                     "status": category_val,
-                    "events": []
+                    "events": [],
+                    "bills": []
                 }
             else:
                 current_prio = category_priority.get(data_map[date_key]["status"], 0)
@@ -97,13 +99,21 @@ def load_calendar_data_sheet(csv_url):
                 if new_prio > current_prio:
                     data_map[date_key]["status"] = category_val
 
+            # Sort entries into bills vs general events based on category or presence of amount
+            is_bill = category_val.lower() == "bill" or amount_val != ""
+            
             if title:
-                data_map[date_key]["events"].append({
+                item_payload = {
                     "title": title,
                     "time": time_val,
                     "location": location_val,
-                    "category": category_val
-                })
+                    "category": category_val,
+                    "amount": amount_val
+                }
+                if is_bill:
+                    data_map[date_key]["bills"].append(item_payload)
+                else:
+                    data_map[date_key]["events"].append(item_payload)
 
     except Exception as e:
         st.error(f"Error fetching data from Google Sheets: {e}")
@@ -196,7 +206,7 @@ calendar_html = f"""
         font-weight: 700;
         text-align: center;
         padding: 4px 0;
-        width: 2.3%;
+        width: 2.4%;
     }}
 
     th.col-header-first {{
@@ -221,7 +231,7 @@ calendar_html = f"""
 
     .day-cell {{
         height: 26px;
-        width: 2.3%;
+        width: 2.4%;
         border-radius: 4px;
         text-align: center;
         font-size: 10px;
@@ -313,7 +323,7 @@ calendar_html = f"""
 
     .tab-bar {{
         display: flex;
-        gap: 4px;
+        gap: 8px;
         border-bottom: 1px solid #222734;
         margin-bottom: 12px;
     }}
@@ -327,6 +337,7 @@ calendar_html = f"""
         padding: 6px 12px;
         cursor: pointer;
         border-bottom: 2px solid transparent;
+        transition: color 0.15s ease;
     }}
 
     .tab-btn.active {{
@@ -350,6 +361,10 @@ calendar_html = f"""
         padding: 10px 14px;
         border-radius: 6px;
         margin-bottom: 8px;
+    }}
+
+    .bill-card {{
+        border-left-color: #facc15;
     }}
 
     .card-meta {{
@@ -398,9 +413,11 @@ calendar_html = f"""
 
     <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('eventsTab', this)">Events & Schedule</button>
+        <button class="tab-btn" onclick="switchTab('billsTab', this)">Bills</button>
     </div>
 
     <div id="eventsTab" class="tab-content active"></div>
+    <div id="billsTab" class="tab-content"></div>
 </div>
 
 <script>
@@ -413,7 +430,7 @@ calendar_html = f"""
     
     // Day letter sequence starting on Tuesday
     const dayLetters = ["T", "W", "T", "F", "S", "S", "M"]; 
-    const TOTAL_GRID_COLS = 39; // Expanded to accommodate the 2-column shift smoothly
+    const TOTAL_GRID_COLS = 37; // Trimmed exact size to avoid trailing extra day letters
 
     function getCssClassForCategory(category) {{
         switch(category) {{
@@ -429,7 +446,7 @@ calendar_html = f"""
         const grid = document.getElementById('calendarGrid');
         let html = '<thead><tr><th class="col-header-first">2026</th>';
         
-        // Render headers starting at Tuesday (T, W, T, F, S, S, M...)
+        // Render headers up to exact 37 grid columns
         for (let col = 0; col < TOTAL_GRID_COLS; col++) {{
             const letter = dayLetters[col % 7];
             html += `<th class="col-header">${{letter}}</th>`;
@@ -442,8 +459,6 @@ calendar_html = f"""
             
             const firstOfMonthDate = new Date(YEAR, mIdx, 1);
             const jsDay = firstOfMonthDate.getDay(); 
-            
-            // Calculate column offset relative to Tuesday (jsDay 2: Sun=0, Mon=1, Tue=2, Wed=3, Thu=4...)
             const offset = (jsDay - 2 + 7) % 7; 
 
             let currentDay = 1;
@@ -493,18 +508,16 @@ calendar_html = f"""
         const dStr = String(day).padStart(2, '0');
         const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
 
-        const dayData = sheetData[dateKey] || {{ events: [] }};
+        const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
         
+        // Render Events
         const eventsTab = document.getElementById('eventsTab');
-        eventsTab.innerHTML = dayData.events.length > 0 
-            ? dayData.events.map(e => {{
+        const eventsList = dayData.events || [];
+        eventsTab.innerHTML = eventsList.length > 0 
+            ? eventsList.map(e => {{
                 let metaHtml = '';
-                if (e.time) {{
-                    metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>`;
-                }}
-                if (e.location) {{
-                    metaHtml += `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>`;
-                }}
+                if (e.time) metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>`;
+                if (e.location) metaHtml += `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>`;
                 
                 return `
                     <div class="data-card">
@@ -514,6 +527,24 @@ calendar_html = f"""
                 `;
             }}).join('')
             : `<p style="color:#64748b;">No events recorded for this date.</p>`;
+
+        // Render Bills
+        const billsTab = document.getElementById('billsTab');
+        const billsList = dayData.bills || [];
+        billsTab.innerHTML = billsList.length > 0 
+            ? billsList.map(b => {{
+                let metaHtml = '';
+                if (b.amount) metaHtml += `<span class="meta-item" style="color:#facc15; font-weight:600;">💵 ${{b.amount}}</span>`;
+                if (b.time) metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{b.time}}</span>`;
+                
+                return `
+                    <div class="data-card bill-card">
+                        <div style="color:#fff; font-weight:600;">${{b.title}}</div>
+                        ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
+                    </div>
+                `;
+            }}).join('')
+            : `<p style="color:#64748b;">No bills due on this date.</p>`;
     }}
 
     function switchTab(tabId, btn) {{
