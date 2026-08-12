@@ -353,7 +353,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management & Query Parameter Bridge
+# 4. State Management with Native Streamlit Widget Bridge
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today()
 
@@ -363,26 +363,13 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-query_params = st.query_params
-if "tab" in query_params:
-    st.session_state["active_tab"] = query_params["tab"]
-if "preview_date" in query_params:
-    try:
-        st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
-    except:
-        pass
-    st.query_params.clear()
-    st.rerun()
-
 focus_date_val = st.session_state["focus_date"]
 focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_val, datetime.date) else str(focus_date_val)
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Bar
+# 5. Render Custom Navigation Bar (Focus View tab has NO hardcoded date)
 # -----------------------------------------------------------------------------
-focus_label = f"🔍  Focus View: {focus_date_str}"
-
 col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
 
 with col_nav1:
@@ -393,7 +380,7 @@ with col_nav1:
 
 with col_nav2:
     is_focus_active = (current_tab == "Focus")
-    if st.button(focus_label, use_container_width=True, type="primary" if is_focus_active else "secondary"):
+    if st.button("🔍  Focus View", use_container_width=True, type="primary" if is_focus_active else "secondary"):
         st.session_state["active_tab"] = "Focus"
         st.rerun()
 
@@ -410,14 +397,28 @@ st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 # =============================================================================
 if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
-    json_data = json.dumps(live_data)
+    
+    # We use a native Streamlit date_input cleanly integrated as our state bridge.
+    # Changing this updates the focus date instantly without any iframe cross-origin blocking!
+    col_bridge1, col_bridge2 = st.columns([2, 5])
+    with col_bridge1:
+        selected_bridge_date = st.date_input(
+            "Selected Calendar Date",
+            value=st.session_state["focus_date"],
+            label_visibility="collapsed"
+        )
+        if selected_bridge_date != st.session_state["focus_date"]:
+            st.session_state["focus_date"] = selected_bridge_date
+            st.rerun()
+    with col_bridge2:
+        st.markdown("<div style='font-size: 11px; color: #38bdf8; padding-top: 6px;'>💡 Select a date above or click any date in your calendar grid below.</div>", unsafe_allow_html=True)
 
+    json_data = json.dumps(live_data)
     today_date = datetime.date.today()
     today_formatted = today_date.strftime("%A, %B %d, %Y")
     today_m_idx = today_date.month - 1
     today_d_num = today_date.day
 
-    # Pass the current session state focus date to JavaScript for initial pre-selection
     selected_js_date_str = focus_date_str
 
     calendar_html = f"""
@@ -492,7 +493,7 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date to preview details & sync Focus View button</div>
+            <div class="click-hint">💡 Click any date to preview details & sync Focus View</div>
         </div>
     </div>
 
@@ -613,13 +614,10 @@ if current_tab == "Calendar":
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
 
-            // Push clicked date to Python via query parameter reload bridge
+            // Send selected date back to outer parent window via postMessage bridge
             try {{
-                const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
-                window.top.location.href = targetUrl;
-            }} catch(e) {{
-                window.parent.location.href = '?preview_date=' + dateKey;
-            }}
+                window.parent.postMessage({{ type: 'streamlit:set_focus_date', date: dateKey }}, '*');
+            }} catch(e) {{}}
         }}
 
         function switchTab(tabId, btn) {{
@@ -635,7 +633,6 @@ if current_tab == "Calendar":
             const [aY, aM, aD] = activeKey.split("-").map(Number);
             const targetCell = document.getElementById(`cell-${{aM - 1}}-${{aD}}`);
             if (targetCell) {{
-                // Highlight without reloading on initial load
                 targetCell.classList.add('selected');
                 selectDateSilently(aM - 1, aD, months[aM - 1], targetCell);
             }}
