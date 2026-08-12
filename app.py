@@ -59,7 +59,6 @@ def load_calendar_data_sheet(csv_url):
     """
     data_map = {}
 
-    # Category hierarchy to determine cell color if multiple events exist on one date
     category_priority = {
         "Public Holiday": 5,
         "Holiday": 4,
@@ -77,7 +76,6 @@ def load_calendar_data_sheet(csv_url):
             if not raw_date or raw_date.lower() == "nan":
                 continue
 
-            # Ensure date is standard YYYY-MM-DD
             try:
                 date_obj = pd.to_datetime(raw_date)
                 date_key = date_obj.strftime("%Y-%m-%d")
@@ -95,11 +93,9 @@ def load_calendar_data_sheet(csv_url):
             if date_key not in data_map:
                 data_map[date_key] = {
                     "status": category_val,
-                    "events": [],
-                    "bills": []
+                    "events": []
                 }
             else:
-                # Update status if new event has a higher-priority category (e.g. Holiday over Working)
                 current_prio = category_priority.get(data_map[date_key]["status"], 0)
                 new_prio = category_priority.get(category_val, 0)
                 if new_prio > current_prio:
@@ -431,6 +427,7 @@ calendar_html = f"""
         const grid = document.getElementById('calendarGrid');
         let html = '<thead><tr><th class="col-header-first">2026</th>';
         
+        // 1. Column Headers now show Day Numbers (1, 2, 3... 31)
         for (let d = 1; d <= 31; d++) {{
             html += `<th class="col-header">${{d}}</th>`;
         }}
@@ -442,9 +439,6 @@ calendar_html = f"""
 
             for (let d = 1; d <= 31; d++) {{
                 if (d <= totalDays) {{
-                    const dateObj = new Date(YEAR, mIdx, d);
-                    const dayLetter = dateObj.toLocaleDateString('en-US', {{ weekday: 'narrow' }});
-                    
                     const mStr = String(mIdx + 1).padStart(2, '0');
                     const dStr = String(d).padStart(2, '0');
                     const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
@@ -456,10 +450,11 @@ calendar_html = f"""
                     const isToday = (mIdx === TODAY.month && d === TODAY.day);
                     const todayClass = isToday ? 'is-today' : '';
                     
+                    // 2. Cell content now shows the Day Number (d) instead of day letter
                     html += `<td class="day-cell ${{statusClass}} ${{todayClass}}" 
                                  id="cell-${{mIdx}}-${{d}}"
                                  onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
-                                 ${{dayLetter}}
+                                 ${{d}}
                              </td>`;
                 }} else {{
                     html += '<td style="background:transparent;"></td>';
@@ -488,7 +483,6 @@ calendar_html = f"""
 
         const dayData = sheetData[dateKey] || {{ events: [] }};
         
-        // Render Events
         const eventsTab = document.getElementById('eventsTab');
         eventsTab.innerHTML = dayData.events.length > 0 
             ? dayData.events.map(e => {{
