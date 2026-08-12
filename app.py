@@ -41,23 +41,17 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Custom Radio Navigation Styling to mimic Tabs */
-    div[data-testid="stHorizontalBlock"] {
+    /* Restore native st.tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
         gap: 8px !important;
-    }
-    
-    .stRadio > div {
         background-color: #11151c !important;
         padding: 6px 8px !important;
         border-radius: 10px !important;
         border: 1px solid #222734 !important;
         margin-bottom: 16px !important;
-        display: flex !important;
-        flex-direction: row !important;
-        gap: 8px !important;
     }
 
-    .stRadio label {
+    .stTabs [data-baseweb="tab"] {
         background-color: #161a22 !important;
         border: 1px solid #2a324b !important;
         border-radius: 8px !important;
@@ -65,7 +59,11 @@ st.markdown("""
         color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 14px !important;
-        cursor: pointer !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: #1d2433 !important;
+        border-color: #38bdf8 !important;
     }
 
     .section-header {
@@ -376,47 +374,35 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Initialization & Routing
+# 4. State Initialization & Routing via Native Tabs
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today().strftime("%Y-%m-%d")
 
 if "focus_date" not in st.session_state or not st.session_state["focus_date"]:
     st.session_state["focus_date"] = today_default
 
-if "nav_tab" not in st.session_state:
-    st.session_state["nav_tab"] = "Calendar & Schedule"
-
 # Handle incoming query parameters from double-clicks inside the calendar iframe
 query_date = st.query_params.get("focus_date", "")
 if query_date:
     st.session_state["focus_date"] = query_date
-    st.session_state["nav_tab"] = "Focus View"
     st.query_params.clear()
     st.rerun()
 
 focus_date_str = st.session_state["focus_date"]
 
 # -----------------------------------------------------------------------------
-# 5. Top Tab Navigation (Radio-driven for State Preservation)
+# 5. Native Streamlit Tabs Navigation
 # -----------------------------------------------------------------------------
-tab_labels = [
+tab1, tab2, tab3 = st.tabs([
     "📅  Calendar & Schedule",
     f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View",
     "💰  Finances & Net Worth"
-]
-
-selected_tab = st.radio(
-    "Navigation Tabs",
-    options=tab_labels,
-    key="nav_tab",
-    horizontal=True,
-    label_visibility="collapsed"
-)
+])
 
 # =============================================================================
 # TAB 1: CALENDAR
 # =============================================================================
-if selected_tab.startswith("📅"):
+with tab1:
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     json_data = json.dumps(live_data)
 
@@ -653,7 +639,7 @@ if selected_tab.startswith("📅"):
 # =============================================================================
 # TAB 2: FOCUS VIEW
 # =============================================================================
-elif selected_tab.startswith("🔍"):
+with tab2:
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
     try:
@@ -755,7 +741,7 @@ elif selected_tab.startswith("🔍"):
 # =============================================================================
 # TAB 3: FINANCIAL DASHBOARD
 # =============================================================================
-elif selected_tab.startswith("💰"):
+with tab3:
     fin = fetch_finances_data(FINANCES_URL)
 
     if fin:
