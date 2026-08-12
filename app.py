@@ -685,7 +685,7 @@ elif current_tab == "Focus":
         else:
             st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No bills due today.</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='section-header' style='margin-top:20px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header' style='margin-top:20px;'>Upcoming Week</div>", unsafe_allow_html=True)
     
     # Render Upcoming Week Cards (Days 1 to 7)
     week_cols = st.columns(7)
@@ -717,43 +717,59 @@ elif current_tab == "Focus":
                 else:
                     st.markdown("<div style='color:#64748b; font-size:11px; min-height: 25px;'>No events or bills.</div>", unsafe_allow_html=True)
 
-    # Next Month Overview Header (Next 30 Days after the upcoming week, i.e., Days 8 to 37)
-    st.markdown("<div class='section-header' style='margin-top:28px;'>📅 Next Month Overview (Next 30 Days)</div>", unsafe_allow_html=True)
+    # Next Month Overview Header (Next 30 Days starting right after the upcoming week: Days 8 to 37)
+    st.markdown("<div class='section-header' style='margin-top:28px;'>Next Month Overview</div>", unsafe_allow_html=True)
     
     month_events_list = []
     for i in range(8, 38):
         m_dt = focus_date_val + datetime.timedelta(days=i)
         m_key = m_dt.strftime("%Y-%m-%d")
-        m_data = live_data.get(m_key)
-        if m_data and (m_data["events"] or m_data["bills"]):
-            month_events_list.append({
-                "date_str": m_dt.strftime("%b %d (%a)"),
-                "events": [e['title'] for e in m_data["events"]],
-                "bills": [b['title'] for b in m_data["bills"]]
-            })
+        m_data = live_data.get(m_key, {"events": [], "bills": []})
+        month_events_list.append({
+            "date_str": m_dt.strftime("%b %d (%a)"),
+            "events": [e['title'] for e in m_data["events"]],
+            "bills": [b['title'] for b in m_data["bills"]]
+        })
 
-    if month_events_list:
-        rows = [month_events_list[idx:idx + 5] for idx in range(0, len(month_events_list), 5)]
-        for row in rows:
-            cols = st.columns(5)
-            for idx, item in enumerate(row):
-                with cols[idx]:
-                    content_inner = f"<div style='font-weight:700; color:#e2e8f0; font-size:11px; border-bottom:1px solid #222734; padding-bottom:2px; margin-bottom:3px;'>{item['date_str']}</div>"
-                    for ev in item["events"]:
-                        content_inner += f"<div style='color:#38bdf8; font-size:10px; margin-top:2px; line-height:1.2;'>📅 {ev}</div>"
-                    for bi in item["bills"]:
-                        content_inner += f"<div style='color:#facc15; font-size:10px; margin-top:2px; line-height:1.2;'>💸 {bi}</div>"
-                    
-                    st.markdown(f"""
-                    <div style="background:#161a22; border:1px solid #222734; border-radius:8px; padding:8px; height:105px; overflow-y:auto; margin-bottom:6px;">
-                        {content_inner}
-                    </div>
-                    """, unsafe_allow_html=True)
-            for idx in range(len(row), 5):
-                with cols[idx]:
-                    st.markdown("", unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
+    # Render full 30 days in rows of 7, with the remaining 2 days centered on the final row
+    full_weeks = [month_events_list[idx:idx + 7] for idx in range(0, 28, 7)]
+    remaining_days = month_events_list[28:]  # Exactly 2 days
+
+    for row in full_weeks:
+        cols = st.columns(7)
+        for idx, item in enumerate(row):
+            with cols[idx]:
+                content_inner = f"<div style='font-weight:700; color:#e2e8f0; font-size:11px; border-bottom:1px solid #222734; padding-bottom:2px; margin-bottom:3px;'>{item['date_str']}</div>"
+                for ev in item["events"]:
+                    content_inner += f"<div style='color:#38bdf8; font-size:10px; margin-top:2px; line-height:1.2;'>📅 {ev}</div>"
+                for bi in item["bills"]:
+                    content_inner += f"<div style='color:#facc15; font-size:10px; margin-top:2px; line-height:1.2;'>💸 {bi}</div>"
+                
+                st.markdown(f"""
+                <div style="background:#161a22; border:1px solid #222734; border-radius:8px; padding:8px; height:105px; overflow-y:auto; margin-bottom:6px;">
+                    {content_inner}
+                </div>
+                """, unsafe_allow_html=True)
+
+    # Center the remaining 2 days at the bottom using empty filler columns around them
+    if remaining_days:
+        rem_cols = st.columns(7)
+        # Place the 2 items in columns index 2 and 3 so they are neatly centered out of 7
+        target_indices = [2, 3]
+        for i, item in enumerate(remaining_days):
+            col_idx = target_indices[i]
+            with rem_cols[col_idx]:
+                content_inner = f"<div style='font-weight:700; color:#e2e8f0; font-size:11px; border-bottom:1px solid #222734; padding-bottom:2px; margin-bottom:3px;'>{item['date_str']}</div>"
+                for ev in item["events"]:
+                    content_inner += f"<div style='color:#38bdf8; font-size:10px; margin-top:2px; line-height:1.2;'>📅 {ev}</div>"
+                for bi in item["bills"]:
+                    content_inner += f"<div style='color:#facc15; font-size:10px; margin-top:2px; line-height:1.2;'>💸 {bi}</div>"
+                
+                st.markdown(f"""
+                <div style="background:#161a22; border:1px solid #222734; border-radius:8px; padding:8px; height:105px; overflow-y:auto; margin-bottom:6px;">
+                    {content_inner}
+                </div>
+                """, unsafe_allow_html=True)
 
 
 # =============================================================================
