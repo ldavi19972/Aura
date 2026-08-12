@@ -379,7 +379,7 @@ focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_va
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Bar (Focus View tab has NO hardcoded date)
+# 5. Render Custom Navigation Bar
 # -----------------------------------------------------------------------------
 col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
 
@@ -610,12 +610,12 @@ if current_tab == "Calendar":
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
 
-            // Push clicked date to Python via query parameter reload bridge
+            // Reliable cross-frame navigation fallback for Streamlit sandbox
             try {{
-                const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
-                window.top.location.href = targetUrl;
+                const targetUrl = window.parent.location.origin + window.parent.location.pathname + '?preview_date=' + dateKey;
+                window.parent.location.href = targetUrl;
             }} catch(e) {{
-                window.parent.location.href = '?preview_date=' + dateKey;
+                window.location.href = '?preview_date=' + dateKey;
             }}
         }}
 
@@ -680,7 +680,7 @@ if current_tab == "Calendar":
     """
     components.html(calendar_html, height=695, scrolling=False)
 
-    # Native Streamlit Action Button safely rendered right below calendar component (no input boxes needed)
+    # Native Streamlit Action Button safely rendered right below calendar component
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
     c_btn1, c_btn2, c_btn3 = st.columns([2, 3, 2])
     with c_btn2:
