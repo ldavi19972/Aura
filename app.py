@@ -379,7 +379,7 @@ focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_va
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Bar (Focus View tab title has no hardcoded date)
+# 5. Render Custom Navigation Bar (Focus View tab has NO hardcoded date)
 # -----------------------------------------------------------------------------
 col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
 
@@ -408,22 +408,8 @@ st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 # =============================================================================
 if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
-    
-    # Native date picker that automatically stays in sync with calendar clicks
-    col_bridge1, col_bridge2 = st.columns([2, 5])
-    with col_bridge1:
-        selected_bridge_date = st.date_input(
-            "Selected Calendar Date",
-            value=st.session_state["focus_date"],
-            label_visibility="collapsed"
-        )
-        if selected_bridge_date != st.session_state["focus_date"]:
-            st.session_state["focus_date"] = selected_bridge_date
-            st.rerun()
-    with col_bridge2:
-        st.markdown("<div style='font-size: 11px; color: #38bdf8; padding-top: 6px;'>💡 Clicking any date in your calendar grid below instantly updates this picker and the Focus View button.</div>", unsafe_allow_html=True)
-
     json_data = json.dumps(live_data)
+
     today_date = datetime.date.today()
     today_formatted = today_date.strftime("%A, %B %d, %Y")
     today_m_idx = today_date.month - 1
@@ -503,7 +489,7 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date to instantly sync picker & Focus View button</div>
+            <div class="click-hint">💡 Click any date in your calendar to instantly update Focus View</div>
         </div>
     </div>
 
@@ -694,7 +680,7 @@ if current_tab == "Calendar":
     """
     components.html(calendar_html, height=695, scrolling=False)
 
-    # Native Streamlit Action Button safely rendered right below calendar component
+    # Native Streamlit Action Button safely rendered right below calendar component (no input boxes needed)
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
     c_btn1, c_btn2, c_btn3 = st.columns([2, 3, 2])
     with c_btn2:
