@@ -610,7 +610,7 @@ if current_tab == "Calendar":
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
 
-            // Trigger immediate Streamlit rerun using location reload bridge
+            // Send selected date back to Streamlit container via query params bridge
             try {{
                 const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
                 window.top.location.href = targetUrl;
@@ -628,13 +628,14 @@ if current_tab == "Calendar":
 
         renderGrid();
         setTimeout(() => {{
-            const todayCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
-            if (todayCell) {{
-                // Only select today if no active preview date is currently set
-                const urlParams = new URLSearchParams(window.top.location.search);
-                if (!urlParams.has('preview_date')) {{
-                    selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', todayCell);
-                }}
+            const currentSelectedKey = "{focus_date_str}";
+            const [cY, cM, cD] = currentSelectedKey.split("-").map(Number);
+            const targetCell = document.getElementById(`cell-${{cM - 1}}-${{cD}}`);
+            if (targetCell) {{
+                selectDate(cM - 1, cD, months[cM - 1], 'Working', 'status-working', targetCell);
+            }} else {{
+                const todayCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
+                if (todayCell) selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', todayCell);
             }}
         }}, 50);
     </script>
@@ -644,7 +645,7 @@ if current_tab == "Calendar":
     """
     components.html(calendar_html, height=695, scrolling=False)
 
-    # Capture preview date selection from HTML calendar and trigger instant rerun
+    # Capture preview date selection from HTML calendar and instantly rerun
     if "preview_date" in query_params:
         try:
             st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
