@@ -42,11 +42,6 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Remove vertical gap between Streamlit elements in cashflow column */
-    [data-testid="stVerticalBlock"] {
-        gap: 6px !important;
-    }
-
     /* Tab Bar Styling - High Contrast Unselected State */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
@@ -54,7 +49,7 @@ st.markdown("""
         padding: 6px 8px;
         border-radius: 10px;
         border: 1px solid #1e2638;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
     }
 
     .stTabs [data-baseweb="tab"] {
@@ -63,9 +58,9 @@ st.markdown("""
         color: #cbd5e1 !important; /* Brighter, high-contrast text for unselected state */
         font-weight: 600;
         font-size: 14px;
-        border: 1px solid #2a324b !important; /* Subtle boundary border */
+        border: 1px solid #2a324b !important;
         padding: 0 24px;
-        background: #1e2430 !important; /* Visible dark-slate card background */
+        background: #1e2430 !important;
         transition: all 0.2s ease-in-out;
     }
 
@@ -75,6 +70,15 @@ st.markdown("""
         font-weight: 700 !important;
         border: 1px solid #38bdf8 !important;
         box-shadow: 0 0 12px rgba(56, 189, 248, 0.35) !important;
+    }
+
+    /* Section Headers styling */
+    .section-header {
+        font-size: 15px;
+        color: #cbd5e1;
+        font-weight: 700;
+        margin-top: 28px;    /* Increased vertical separation from top components */
+        margin-bottom: 10px;
     }
 
     /* Metric Cards */
@@ -163,7 +167,7 @@ st.markdown("""
         border: 1px solid #222734;
         border-radius: 10px;
         padding: 10px 14px;
-        margin-bottom: 0px;
+        margin-bottom: 6px;
     }
 
     .cf-row {
@@ -184,7 +188,7 @@ st.markdown("""
         background: #161a22 !important;
         border: 1px solid #222734 !important;
         border-radius: 10px !important;
-        margin: 0px !important;
+        margin-bottom: 6px !important;
         padding: 0px !important;
         overflow: hidden !important;
     }
@@ -354,7 +358,6 @@ def fetch_finances_data(finances_url):
         fin_data["net_flow"]["yr"] = clean_num(df.iloc[19, 6])
     except Exception: pass
 
-    # Exact Bill Frequency Mapping matching sheet bold font specifications
     KNOWN_BILLS = {
         "rent": ("$721.25", "Weekly"),
         "electricity": ("$242.00", "Quarterly"),
@@ -690,7 +693,7 @@ with tab_fin:
     fin = fetch_finances_data(FINANCES_URL)
 
     if fin:
-        # KPI Bar
+        # KPI Bar (Row 1)
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             st.markdown(f"""
@@ -721,14 +724,12 @@ with tab_fin:
             </div>
             """, unsafe_allow_html=True)
 
-        # FIX: Explicit larger gap spacer below KPI boxes
-        st.markdown("<div style='margin-bottom: 24px;'></div>", unsafe_allow_html=True)
-
-        # Main Grid
+        # Main Grid (Row 2: Savings Goal Tracker & Cash Flow Summary)
         col_goals, col_cash = st.columns([1.2, 1])
 
         with col_goals:
-            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>🎯 Savings & Goal Tracker</h4>", unsafe_allow_html=True)
+            # FIX: Added margin-top:28px for explicit larger gap above section header
+            st.markdown("<div class='section-header' style='margin-top:28px;'>🎯 Savings & Goal Tracker</div>", unsafe_allow_html=True)
 
             for g in fin["goals"]:
                 st.markdown(f"""
@@ -748,7 +749,8 @@ with tab_fin:
                 """, unsafe_allow_html=True)
 
         with col_cash:
-            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>📊 Cash Flow Summary</h4>", unsafe_allow_html=True)
+            # FIX: Added margin-top:28px for explicit larger gap above section header
+            st.markdown("<div class='section-header' style='margin-top:28px;'>📊 Cash Flow Summary</div>", unsafe_allow_html=True)
 
             # Income Card
             st.markdown(f"""
@@ -829,13 +831,12 @@ with tab_fin:
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-
-        # Secondary Grid
+        # Secondary Grid (Row 3: Credit & Loan Repayments / Physical Assets)
         b_col1, b_col2 = st.columns([1, 1])
 
         with b_col1:
-            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>💳 Credit & Loan Repayments</h4>", unsafe_allow_html=True)
+            # FIX: Added margin-top:28px for explicit larger gap above section header
+            st.markdown("<div class='section-header' style='margin-top:28px;'>💳 Credit & Loan Repayments</div>", unsafe_allow_html=True)
             debt_rows = "".join([
                 f'''<div class="cf-row">
                         <div>
@@ -852,7 +853,8 @@ with tab_fin:
             st.markdown(f'<div class="cashflow-card">{debt_rows}</div>', unsafe_allow_html=True)
 
         with b_col2:
-            st.markdown(f"<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</h4>", unsafe_allow_html=True)
+            # FIX: Added margin-top:28px for explicit larger gap above section header
+            st.markdown(f"<div class='section-header' style='margin-top:28px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</div>", unsafe_allow_html=True)
             asset_rows = "".join([
                 f'''<div class="cf-row">
                         <span style="color:#fff; font-weight:600;">{a["item"]}</span>
