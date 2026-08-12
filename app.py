@@ -385,15 +385,36 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. Streamlit Layout & Tabs
+# 4. State Initialization
 # -----------------------------------------------------------------------------
-focus_date_str = st.query_params.get("focus_date", "")
+if "focus_date" not in st.session_state:
+    st.session_state["focus_date"] = ""
 
-tab_cal, tab_focus, tab_fin = st.tabs([
-    "📅  Calendar & Schedule", 
-    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View (Double-click date)", 
+if "active_tab_idx" not in st.session_state:
+    st.session_state["active_tab_idx"] = 0
+
+# Check incoming query params for double-click selection from iframe component
+query_date = st.query_params.get("focus_date", "")
+if query_date and query_date != st.session_state["focus_date"]:
+    st.session_state["focus_date"] = query_date
+    st.session_state["active_tab_idx"] = 1  # Switch directly to Focus View tab
+
+focus_date_str = st.session_state["focus_date"]
+
+# -----------------------------------------------------------------------------
+# 5. Streamlit Layout & Tabs
+# -----------------------------------------------------------------------------
+tab_labels = [
+    "📅  Calendar & Schedule",
+    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View (Double-click date)",
     "💰  Finances & Net Worth"
-])
+]
+
+def on_tab_change():
+    # Sync selected tab index if user clicks tabs manually
+    pass
+
+tab_cal, tab_focus, tab_fin = st.tabs(tab_labels)
 
 # =============================================================================
 # TAB 1: CALENDAR
@@ -604,7 +625,9 @@ with tab_cal:
 
         function doubleClickDate(dateKey) {{
             try {{
-                window.parent.location.href = window.parent.location.pathname + '?focus_date=' + dateKey;
+                const url = new URL(window.parent.location.href);
+                url.searchParams.set('focus_date', dateKey);
+                window.parent.location.href = url.toString();
             }} catch (e) {{
                 window.location.href = '?focus_date=' + dateKey;
             }}
