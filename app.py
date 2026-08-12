@@ -42,7 +42,7 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Tab Bar Styling - High Contrast Unselected State */
+    /* Tab Bar Styling - High-contrast white unselected & natural dark active state */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: #11151c;
@@ -52,24 +52,36 @@ st.markdown("""
         margin-bottom: 16px;
     }
 
+    /* Unselected Tabs */
     .stTabs [data-baseweb="tab"] {
         height: 44px;
         border-radius: 8px;
-        color: #cbd5e1 !important; /* Brighter, high-contrast text for unselected state */
-        font-weight: 600;
-        font-size: 14px;
         border: 1px solid #2a324b !important;
         padding: 0 24px;
-        background: #1e2430 !important;
+        background: #181d27 !important;
         transition: all 0.2s ease-in-out;
     }
 
-    .stTabs [aria-selected="true"] {
-        background-color: #0284c7 !important;
+    /* Force pure white text on all child elements (p tags) in unselected state */
+    .stTabs [data-baseweb="tab"] p,
+    .stTabs [data-baseweb="tab"] span {
         color: #ffffff !important;
-        font-weight: 700 !important;
+        opacity: 1 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+    }
+
+    /* Selected Tab - Natural Slate Dark with Accent Border */
+    .stTabs [aria-selected="true"] {
+        background-color: #1e293b !important;
         border: 1px solid #38bdf8 !important;
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.35) !important;
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.2) !important;
+    }
+
+    .stTabs [aria-selected="true"] p,
+    .stTabs [aria-selected="true"] span {
+        color: #38bdf8 !important;
+        font-weight: 700 !important;
     }
 
     /* Section Headers styling */
@@ -77,7 +89,7 @@ st.markdown("""
         font-size: 15px;
         color: #cbd5e1;
         font-weight: 700;
-        margin-top: 28px;    /* Increased vertical separation from top components */
+        margin-top: 28px;
         margin-bottom: 10px;
     }
 
@@ -327,7 +339,7 @@ def fetch_finances_data(finances_url):
         "assets": []
     }
 
-    # 1. Parse Top Net Worth KPIs
+    # Parse Top Net Worth KPIs
     try:
         for r in range(len(df)):
             row_vals = [str(x).strip() for x in df.iloc[r].values]
@@ -342,7 +354,7 @@ def fetch_finances_data(finances_url):
 
     fin_data["kpis"]["net"] = fin_data["kpis"]["savings"] + fin_data["kpis"]["credit"] + fin_data["kpis"]["assets"]
 
-    # 2. Parse Income & Expenses Summary
+    # Parse Income & Expenses Summary
     try:
         fin_data["income"]["total_wk"] = clean_num(df.iloc[3, 3])
         fin_data["income"]["salary_wk"] = clean_num(df.iloc[4, 3])
@@ -367,7 +379,7 @@ def fetch_finances_data(finances_url):
         "internet": ("$49.00", "Monthly"),
     }
 
-    # Fixed Bills (Rows 8-13)
+    # Fixed Bills
     for r in range(8, 14):
         try:
             name = str(df.iloc[r, 2]).strip()
@@ -381,7 +393,7 @@ def fetch_finances_data(finances_url):
                 fin_data["fixed_bills"].append({"item": name, "weekly": wk_impact, "native": native_amt, "freq": freq})
         except: pass
 
-    # Variable Budgets (Rows 15-17)
+    # Variable Budgets
     for r in range(15, 18):
         try:
             name = str(df.iloc[r, 2]).strip()
@@ -390,7 +402,7 @@ def fetch_finances_data(finances_url):
                 fin_data["var_budgets"].append({"item": name, "weekly": f"${wk_val:,.2f}"})
         except: pass
 
-    # 3. Dynamic Goals Parser
+    # Dynamic Goals Parser
     goal_specs = [
         {"name": "Italy", "target": 7000.00, "end_date": "9-Sep-2026", "rate": 1037.50, "status": "IN PROGRESS"},
         {"name": "New Zealand", "target": 2087.98, "end_date": "", "rate": 0.00, "status": "SAVED"},
@@ -446,7 +458,7 @@ def fetch_finances_data(finances_url):
             "details": details
         })
 
-    # 4. Debts Parsing
+    # Debts Parsing
     for r in [22, 23]:
         try:
             d_name = str(df.iloc[r, 2]).strip()
@@ -460,7 +472,7 @@ def fetch_finances_data(finances_url):
                 })
         except: pass
 
-    # 5. Physical Assets Parsing
+    # Physical Assets Parsing
     for r in range(3, 9):
         try:
             a_name = str(df.iloc[r, 10]).strip()
@@ -728,7 +740,6 @@ with tab_fin:
         col_goals, col_cash = st.columns([1.2, 1])
 
         with col_goals:
-            # FIX: Added margin-top:28px for explicit larger gap above section header
             st.markdown("<div class='section-header' style='margin-top:28px;'>🎯 Savings & Goal Tracker</div>", unsafe_allow_html=True)
 
             for g in fin["goals"]:
@@ -749,7 +760,6 @@ with tab_fin:
                 """, unsafe_allow_html=True)
 
         with col_cash:
-            # FIX: Added margin-top:28px for explicit larger gap above section header
             st.markdown("<div class='section-header' style='margin-top:28px;'>📊 Cash Flow Summary</div>", unsafe_allow_html=True)
 
             # Income Card
@@ -835,7 +845,6 @@ with tab_fin:
         b_col1, b_col2 = st.columns([1, 1])
 
         with b_col1:
-            # FIX: Added margin-top:28px for explicit larger gap above section header
             st.markdown("<div class='section-header' style='margin-top:28px;'>💳 Credit & Loan Repayments</div>", unsafe_allow_html=True)
             debt_rows = "".join([
                 f'''<div class="cf-row">
@@ -853,7 +862,6 @@ with tab_fin:
             st.markdown(f'<div class="cashflow-card">{debt_rows}</div>', unsafe_allow_html=True)
 
         with b_col2:
-            # FIX: Added margin-top:28px for explicit larger gap above section header
             st.markdown(f"<div class='section-header' style='margin-top:28px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</div>", unsafe_allow_html=True)
             asset_rows = "".join([
                 f'''<div class="cf-row">
