@@ -53,10 +53,6 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=30)
 def load_calendar_data_sheet(csv_url):
-    """
-    Parses the tabular CalendarData sheet containing:
-    Columns: Date | Title | Time | Location | Category
-    """
     data_map = {}
 
     category_priority = {
@@ -195,18 +191,20 @@ calendar_html = f"""
     }}
 
     th.col-header {{
-        color: #64748b;
+        color: #94a3b8;
         font-size: 10px;
-        font-weight: 600;
+        font-weight: 700;
         text-align: center;
-        padding: 3px 0;
-        width: 2.9%;
+        padding: 4px 0;
+        width: 2.4%;
     }}
 
     th.col-header-first {{
-        width: 9%;
+        width: 8%;
         text-align: left;
         padding-left: 6px;
+        color: #cbd5e1;
+        font-size: 12px;
     }}
 
     td.month-label {{
@@ -216,14 +214,14 @@ calendar_html = f"""
         padding: 3px 6px;
         white-space: nowrap;
         text-align: left;
-        width: 9%;
+        width: 8%;
         overflow: hidden;
         text-overflow: ellipsis;
     }}
 
     .day-cell {{
-        height: 28px;
-        width: 2.9%;
+        height: 26px;
+        width: 2.4%;
         border-radius: 4px;
         text-align: center;
         font-size: 10px;
@@ -237,8 +235,8 @@ calendar_html = f"""
     }}
 
     .day-cell:hover {{
-        transform: scale(1.1);
-        border-color: #ffffff77 !important;
+        transform: scale(1.12);
+        border-color: #ffffff99 !important;
         z-index: 10;
     }}
 
@@ -253,7 +251,7 @@ calendar_html = f"""
     }}
 
     /* Color Themes matched to Category */
-    .status-empty {{ background-color: #1a1e27; color: #475569; }}
+    .status-empty {{ background-color: transparent; border: none; cursor: default; }}
     .status-working {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
     .status-public-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
     .status-holiday {{ background-color: #4c0519; color: #fb7185; border-color: #9f1239; }}
@@ -412,6 +410,10 @@ calendar_html = f"""
 
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    
+    // Day letter map starting on Jan 1, 2026 (Thursday)
+    const dayLetters = ["T", "F", "S", "S", "M", "T", "W"]; 
+    const TOTAL_GRID_COLS = 37; // Max columns needed across all months
 
     function getCssClassForCategory(category) {{
         switch(category) {{
@@ -427,18 +429,29 @@ calendar_html = f"""
         const grid = document.getElementById('calendarGrid');
         let html = '<thead><tr><th class="col-header-first">2026</th>';
         
-        // 1. Column Headers now show Day Numbers (1, 2, 3... 31)
-        for (let d = 1; d <= 31; d++) {{
-            html += `<th class="col-header">${{d}}</th>`;
+        // Render 37 column headers with repeating Day Letters (T, F, S, S, M, T, W...)
+        for (let col = 0; col < TOTAL_GRID_COLS; col++) {{
+            const letter = dayLetters[col % 7];
+            html += `<th class="col-header">${{letter}}</th>`;
         }}
         html += '</tr></thead><tbody>';
 
         months.forEach((mName, mIdx) => {{
             html += `<tr><td class="month-label">${{mName}}</td>`;
             const totalDays = daysInMonths[mIdx];
+            
+            // Calculate weekday offset for the 1st of each month relative to Jan 1 (Thursday)
+            const firstOfMonthDate = new Date(YEAR, mIdx, 1);
+            // JavaScript getDay(): 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+            // Jan 1, 2026 is Thursday (4). Calculate column offset relative to Thursday:
+            const jsDay = firstOfMonthDate.getDay(); 
+            const offset = (jsDay - 4 + 7) % 7; 
 
-            for (let d = 1; d <= 31; d++) {{
-                if (d <= totalDays) {{
+            let currentDay = 1;
+
+            for (let col = 0; col < TOTAL_GRID_COLS; col++) {{
+                if (col >= offset && currentDay <= totalDays) {{
+                    const d = currentDay;
                     const mStr = String(mIdx + 1).padStart(2, '0');
                     const dStr = String(d).padStart(2, '0');
                     const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
@@ -450,14 +463,14 @@ calendar_html = f"""
                     const isToday = (mIdx === TODAY.month && d === TODAY.day);
                     const todayClass = isToday ? 'is-today' : '';
                     
-                    // 2. Cell content now shows the Day Number (d) instead of day letter
                     html += `<td class="day-cell ${{statusClass}} ${{todayClass}}" 
                                  id="cell-${{mIdx}}-${{d}}"
                                  onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
                                  ${{d}}
                              </td>`;
+                    currentDay++;
                 }} else {{
-                    html += '<td style="background:transparent;"></td>';
+                    html += '<td class="status-empty"></td>';
                 }}
             }}
             html += '</tr>';
