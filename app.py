@@ -122,16 +122,18 @@ st.markdown("""
     .stExpander summary {
         background-color: #161a22 !important;
         color: #e2e8f0 !important;
-        font-size: 12px !important;
+        font-size: 11px !important;
         font-weight: 600 !important;
-        padding: 10px 14px !important;
+        padding: 6px 10px !important;
         border-radius: 10px !important;
     }
 
     .stExpander [data-testid="stExpanderDetails"] {
         background-color: #161a22 !important;
-        padding: 4px 14px 10px 14px !important;
+        padding: 8px 10px 12px 10px !important;
         border-top: 1px solid #222734 !important;
+        max-height: 250px;
+        overflow-y: auto;
     }
     
     iframe { border: none !important; width: 100% !important; }
@@ -365,7 +367,7 @@ if "tab" in query_params:
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Bar (Shorter & Refined Color Scheme)
+# 5. Render Custom Navigation Bar
 # -----------------------------------------------------------------------------
 col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.0, 1.1, 1.2, 5])
 
@@ -703,20 +705,20 @@ elif current_tab == "Focus":
             </div>
             """, unsafe_allow_html=True)
             
-            # Vertical drop-down expander directly under each respective day card
+            # Vertical expander with tall enough container & text wrapping to prevent cutting off
             day_title = future_dt.strftime('%a, %b %d')
             with st.expander(f"View {day_title}"):
                 if f_data["events"] or f_data["bills"]:
                     for ev in f_data["events"]:
                         time_suffix = f" (@ {ev['time']})" if ev["time"] else ""
-                        st.markdown(f"<div style='color:#38bdf8; font-size:11px; margin-bottom:3px;'>• <b>Event:</b> {ev['title']}{time_suffix}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='color:#38bdf8; font-size:11px; margin-bottom:6px; line-height:1.3; word-break:break-word;'>• <b>Event:</b> {ev['title']}{time_suffix}</div>", unsafe_allow_html=True)
                     for b in f_data["bills"]:
-                        st.markdown(f"<div style='color:#facc15; font-size:11px; margin-bottom:3px;'>• <b>Bill:</b> {b['title']}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='color:#facc15; font-size:11px; margin-bottom:6px; line-height:1.3; word-break:break-word;'>• <b>Bill:</b> {b['title']}</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div style='color:#64748b; font-size:11px;'>No events or bills.</div>", unsafe_allow_html=True)
 
-    # Compact Grid View for Month Overview (Days 8 to 37)
-    st.markdown("<div class='section-header' style='margin-top:25px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
+    # Clean, Streamlined Month Overview View (Days 8 to 37) using native Streamlit columns row-by-row
+    st.markdown("<div class='section-header' style='margin-top:28px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
     
     month_events_list = []
     for i in range(8, 38):
@@ -731,22 +733,21 @@ elif current_tab == "Focus":
             })
 
     if month_events_list:
-        grid_html = """
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px;">
-        """
-        for item in month_events_list:
-            events_tags = "".join([f"<div style='background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-top:2px;'>📅 {ev}</div>" for ev in item["events"]])
-            bills_tags = "".join([f"<div style='background:rgba(250,204,21,0.15); color:#facc15; border:1px solid rgba(250,204,21,0.3); padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-top:2px;'>💸 {bi}</div>" for bi in item["bills"]])
-            
-            grid_html += f"""
-            <div style="background:#161a22; border:1px solid #222734; border-radius:8px; padding:8px 10px;">
-                <div style="font-weight:700; color:#cbd5e1; font-size:11px; border-bottom:1px solid #222734; padding-bottom:3px; margin-bottom:4px;">{item["date_str"]}</div>
-                {events_tags}
-                {bills_tags}
-            </div>
-            """
-        grid_html += "</div>"
-        st.markdown(grid_html, unsafe_allow_html=True)
+        # Group items into neat rows of 3 columns each to form a proper grid format
+        rows = [month_events_list[i:i + 3] for i in range(0, len(month_events_list), 3)]
+        for row in rows:
+            cols = st.columns(len(row))
+            for idx, item in enumerate(row):
+                with cols[idx]:
+                    ev_tags = "".join([f"<div style='color:#38bdf8; font-size:11px; margin-top:2px;'>📅 {ev}</div>" for ev in item["events"]])
+                    bi_tags = "".join([f"<div style='color:#facc15; font-size:11px; margin-top:2px;'>💸 {bi}</div>" for bi in item["bills"]])
+                    st.markdown(f"""
+                    <div style="background:#161a22; border:1px solid #222734; border-radius:8px; padding:10px; min-height:85px; margin-bottom:8px;">
+                        <div style="font-weight:700; color:#e2e8f0; font-size:12px; border-bottom:1px solid #222734; padding-bottom:3px; margin-bottom:4px;">{item["date_str"]}</div>
+                        {ev_tags}
+                        {bi_tags}
+                    </div>
+                    """, unsafe_allow_html=True)
     else:
         st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
 
