@@ -392,7 +392,6 @@ with col_nav3:
 
 st.markdown("""
 <style>
-    /* Sleek custom styling for secondary navigation buttons for high legibility */
     button[kind="secondary"] {
         background-color: #161a22 !important;
         border: 1px solid #28303f !important;
@@ -703,7 +702,7 @@ elif current_tab == "Focus":
             </div>
             """, unsafe_allow_html=True)
 
-    # Individual Expanders for each day of the upcoming week
+    # Individual Expanders for each day of the upcoming week (Fixed String Formatting)
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
     for i in range(1, 8):
         future_dt = focus_date_val + datetime.timedelta(days=i)
@@ -718,13 +717,14 @@ elif current_tab == "Focus":
         with st.expander(expander_label):
             if f_data["events"] or f_data["bills"]:
                 for ev in f_data["events"]:
-                    st.markdown(f"<div style='color:#38bdf8; font-size:12px; margin-bottom:4px;'>• <b>Event:</b> {ev['title']} {f'(@ {ev[\"time\"]})' if ev['time'] else ''}</div>", unsafe_allow_html=True)
+                    time_suffix = f" (@ {ev['time']})" if ev["time"] else ""
+                    st.markdown(f"<div style='color:#38bdf8; font-size:12px; margin-bottom:4px;'>• <b>Event:</b> {ev['title']}{time_suffix}</div>", unsafe_allow_html=True)
                 for b in f_data["bills"]:
                     st.markdown(f"<div style='color:#facc15; font-size:12px; margin-bottom:4px;'>• <b>Bill:</b> {b['title']}</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div style='color:#64748b; font-size:12px;'>No events or bills scheduled for this day.</div>", unsafe_allow_html=True)
 
-    # Redesigned Month Overview View (Structured Card Grid instead of plain text list)
+    # Redesigned Month Overview View
     st.markdown("<div class='section-header' style='margin-top:25px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
     
     month_events_list = []
