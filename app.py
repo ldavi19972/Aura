@@ -353,7 +353,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management with Query Parameter Bridge
+# 4. State Management
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today()
 
@@ -363,17 +363,15 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-# Listen for incoming URL query parameters sent by double-clicks or jumps from the calendar iframe
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
-if "focus_date" in query_params:
+if "preview_date" in query_params:
     try:
-        st.session_state["focus_date"] = datetime.datetime.strptime(query_params["focus_date"], "%Y-%m-%d").date()
+        st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
     except:
         pass
     st.query_params.clear()
-    st.rerun()
 
 focus_date_val = st.session_state["focus_date"]
 focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_val, datetime.date) else str(focus_date_val)
@@ -407,7 +405,7 @@ with col_nav3:
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
 # =============================================================================
-# TAB 1: CALENDAR (Double-Click Bridge Enabled)
+# TAB 1: CALENDAR
 # =============================================================================
 if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
@@ -490,7 +488,7 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Single-click to preview • Double-click any date to jump straight to Focus View</div>
+            <div class="click-hint">💡 Click any date to preview details & enable Focus View button below</div>
         </div>
     </div>
 
@@ -561,8 +559,7 @@ if current_tab == "Calendar":
                         
                         html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}} ${{pastClass}}" 
                                      id="cell-${{mIdx}}-${{d}}"
-                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)"
-                                     ondblclick="doubleClickDate('${{dateKey}}')">
+                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
                                      ${{d}}
                                </td>`;
                         currentDay++;
@@ -611,15 +608,12 @@ if current_tab == "Calendar":
                     </div>
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
-        }}
 
-        function doubleClickDate(dateKey) {{
+            // Bridge selected date cleanly to Streamlit via URL history update
             try {{
-                const targetUrl = window.top.location.origin + window.top.location.pathname + '?focus_date=' + dateKey + '&tab=Focus';
-                window.top.location.href = targetUrl;
-            }} catch (e) {{
-                window.parent.location.href = '?focus_date=' + dateKey + '&tab=Focus';
-            }}
+                const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
+                window.top.history.replaceState(null, '', targetUrl);
+            }} catch(e) {{}}
         }}
 
         function switchTab(tabId, btn) {{
@@ -640,6 +634,22 @@ if current_tab == "Calendar":
     </html>
     """
     components.html(calendar_html, height=695, scrolling=False)
+
+    # Capture preview date selection from HTML calendar
+    if "preview_date" in query_params:
+        try:
+            st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
+        except:
+            pass
+
+    # Native Streamlit Action Button safely rendered right below calendar component
+    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+    c_btn1, c_btn2, c_btn3 = st.columns([2, 3, 2])
+    with c_btn2:
+        btn_date_str = st.session_state["focus_date"].strftime("%B %d, %Y") if isinstance(st.session_state["focus_date"], datetime.date) else focus_date_str
+        if st.button(f"🚀 Open Focus View for {btn_date_str}", use_container_width=True, type="primary"):
+            st.session_state["active_tab"] = "Focus"
+            st.rerun()
 
 
 # =============================================================================
