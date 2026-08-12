@@ -12,7 +12,7 @@ RAW_DATA_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX
 FINANCES_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=1688426207"
 
 # -----------------------------------------------------------------------------
-# 2. Page Configuration & Custom CSS (Restoring your original sleek look)
+# 2. Page Configuration & Custom CSS
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Aura Dashboard 2026",
@@ -43,17 +43,6 @@ st.markdown("""
 
     div[data-testid="stVerticalBlock"] > div.stTabs {
         display: none !important;
-    }
-
-    /* Custom Navigation Bar matching your exact original preference */
-    .custom-nav-bar {
-        display: flex;
-        gap: 8px;
-        background-color: #11151c;
-        padding: 6px 8px;
-        border-radius: 10px;
-        border: 1px solid #222734;
-        margin-bottom: 16px;
     }
 
     .section-header {
@@ -364,7 +353,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management & Streamlit Communications Bridge
+# 4. State Management via Streamlit Query Params
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today().strftime("%Y-%m-%d")
 
@@ -374,7 +363,7 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-# Handle incoming query parameters sent from Python navigation buttons
+# Catch incoming URL updates instantly from frontend double-clicks
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
@@ -388,7 +377,7 @@ focus_date_str = st.session_state["focus_date"]
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Your Original Custom Navigation Bar
+# 5. Render Your Original Sleek Custom Navigation Buttons
 # -----------------------------------------------------------------------------
 focus_label = f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View"
 
@@ -622,7 +611,7 @@ if current_tab == "Calendar":
         }}
 
         function doubleClickDate(dateKey) {{
-            // Bulletproof parent navigation bypassing iframe restrictions securely
+            // Bulletproof navigation: Directly updates the parent frame's top URL to trigger Python state
             try {{
                 const targetUrl = window.top.location.origin + window.top.location.pathname + '?focus_date=' + dateKey + '&tab=Focus';
                 window.top.location.href = targetUrl;
