@@ -41,12 +41,10 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Completely hide duplicate/native Streamlit tabs wrapper so only custom nav/state is used */
     div[data-testid="stVerticalBlock"] > div.stTabs {
         display: none !important;
     }
 
-    /* Custom Navigation Bar matching original look */
     .custom-nav-bar {
         display: flex;
         gap: 8px;
@@ -55,32 +53,6 @@ st.markdown("""
         border-radius: 10px;
         border: 1px solid #222734;
         margin-bottom: 16px;
-    }
-
-    .nav-button {
-        background-color: #161a22;
-        border: 1px solid #2a324b;
-        border-radius: 8px;
-        padding: 8px 20px;
-        color: #ffffff;
-        font-weight: 700;
-        font-size: 14px;
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        transition: all 0.2s ease;
-    }
-
-    .nav-button:hover {
-        border-color: #38bdf8;
-        color: #38bdf8;
-    }
-
-    .nav-button.active {
-        background-color: #1d2433;
-        border-color: #38bdf8;
     }
 
     .section-header {
@@ -401,7 +373,6 @@ if "focus_date" not in st.session_state or not st.session_state["focus_date"]:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-# Capture query params for tab switching or focus date setting from JS interactions
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
@@ -415,7 +386,7 @@ focus_date_str = st.session_state["focus_date"]
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Header (Matching Original Styling & Functionality)
+# 5. Render Custom Navigation Header
 # -----------------------------------------------------------------------------
 focus_label = f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View"
 
@@ -650,10 +621,11 @@ if current_tab == "Calendar":
 
         function doubleClickDate(dateKey) {{
             try {{
-                const url = new URL(window.parent.location.href);
+                // FIXED: Use window.top to navigate the root browser window instead of the iframe container
+                const url = new URL(window.top.location.href);
                 url.searchParams.set('focus_date', dateKey);
                 url.searchParams.set('tab', 'Focus');
-                window.parent.location.href = url.toString();
+                window.top.location.href = url.toString();
             }} catch (e) {{
                 window.location.href = '?focus_date=' + dateKey + '&tab=Focus';
             }}
@@ -677,7 +649,6 @@ if current_tab == "Calendar":
     </html>
     """
     components.html(calendar_html, height=695, scrolling=False)
-
 
 # =============================================================================
 # TAB 2: FOCUS VIEW
@@ -779,7 +750,6 @@ elif current_tab == "Focus":
         st.markdown(f'<div class="cashflow-card" style="max-height: 160px; overflow-y: auto;">{summary_rows}</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
-
 
 # =============================================================================
 # TAB 3: FINANCIAL DASHBOARD
