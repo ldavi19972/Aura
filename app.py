@@ -548,11 +548,21 @@ with tab_cal:
         .day-cell.is-today {{ box-shadow: 0 0 0 2px #38bdf8, 0 0 8px rgba(56, 189, 248, 0.6) !important; border-color: #38bdf8 !important; }}
         .day-cell.selected {{ outline: 2px solid #ffffff; outline-offset: 1px; }}
         .status-empty {{ background-color: transparent; border: none; cursor: default; }}
+        
+        /* Past Days Dimmed Styling */
+        .day-cell.is-past.status-working {{ background-color: #0b2213 !important; color: #23633d !important; border-color: #0e331b !important; }}
+        .day-cell.is-past.status-public-holiday {{ background-color: #112244 !important; color: #2d558c !important; border-color: #142a52 !important; }}
+        .day-cell.is-past.status-holiday {{ background-color: #2b030f !important; color: #823043 !important; border-color: #4a061a !important; }}
+        .day-cell.is-past.status-get-away {{ background-color: #261303 !important; color: #876219 !important; border-color: #452105 !important; }}
+        .day-cell.is-past.status-work-trip {{ background-color: #23043d !important; color: #6d4791 !important; border-color: #3d076b !important; }}
+
+        /* Active/Future Days Styling */
         .status-working {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
         .status-public-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
         .status-holiday {{ background-color: #4c0519; color: #fb7185; border-color: #9f1239; }}
         .status-get-away {{ background-color: #422006; color: #facc15; border-color: #713f12; }}
         .status-work-trip {{ background-color: #3b0764; color: #c084fc; border-color: #6b21a8; }}
+
         .legend-bar {{ display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }}
         .legend-item {{ display: flex; align-items: center; gap: 5px; font-size: 10px; color: #94a3b8; background: #1a1e27; padding: 2px 6px; border-radius: 4px; border: 1px solid #28303f; }}
         .legend-dot {{ width: 7px; height: 7px; border-radius: 2px; }}
@@ -625,6 +635,12 @@ with tab_cal:
             }}
         }}
 
+        function isPastDate(mIdx, d) {{
+            if (mIdx < TODAY.month) return true;
+            if (mIdx === TODAY.month && d < TODAY.day) return true;
+            return false;
+        }}
+
         function renderGrid() {{
             const grid = document.getElementById('calendarGrid');
             let html = '<thead><tr><th class="col-header-first">2026</th>';
@@ -647,8 +663,9 @@ with tab_cal:
                         const categoryName = entry ? entry.status : 'Working';
                         const statusClass = getCssClassForCategory(categoryName);
                         const isToday = (mIdx === TODAY.month && d === TODAY.day);
+                        const pastClass = isPastDate(mIdx, d) ? 'is-past' : '';
                         
-                        html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}}" 
+                        html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}} ${{pastClass}}" 
                                      id="cell-${{mIdx}}-${{d}}"
                                      onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
                                      ${{d}}
@@ -884,6 +901,7 @@ with tab_fin:
             ])
             st.markdown(f'<div class="cashflow-card">{debt_rows}</div>', unsafe_allow_html=True)
 
+        with_col2 = st.columns([1, 1])
         with b_col2:
             st.markdown(f"<div class='section-header' style='margin-top:28px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</div>", unsafe_allow_html=True)
             asset_rows = "".join([
