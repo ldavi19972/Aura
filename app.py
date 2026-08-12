@@ -493,7 +493,7 @@ focus_date_str = st.query_params.get("focus_date", "")
 
 tab_cal, tab_focus, tab_fin = st.tabs([
     "📅  Calendar & Schedule", 
-    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View (Double-Click Date)", 
+    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View (Select Date)", 
     "💰  Finances & Net Worth"
 ])
 
@@ -560,7 +560,7 @@ with tab_cal:
         .bill-card {{ border-left-color: #facc15; }}
         .card-meta {{ display: flex; align-items: center; gap: 12px; margin-top: 2px; font-size: 11px; }}
         .meta-item {{ display: flex; align-items: center; gap: 4px; }}
-        .double-click-hint {{ font-size: 10px; color: #38bdf8; margin-top: 6px; text-align: right; }}
+        .click-hint {{ font-size: 10px; color: #38bdf8; margin-top: 6px; text-align: right; }}
     </style>
     </head>
     <body>
@@ -581,7 +581,7 @@ with tab_cal:
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="double-click-hint">💡 Double-click any date to open Focus Tab</div>
+            <div class="click-hint">💡 Click any date to load details & enable Focus Tab button</div>
         </div>
     </div>
 
@@ -589,6 +589,10 @@ with tab_cal:
         <div class="panel-header">
             <div class="panel-title" id="selectedDateTitle">Select a date</div>
             <div class="status-badge status-working" id="selectedStatusBadge">Working</div>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+            <a id="focusLinkBtn" href="#" target="_top" style="display: none; background: #1c212c; color: #38bdf8; border: 1px solid #3b4252; padding: 5px 12px; border-radius: 6px; font-size: 11px; text-decoration: none; font-weight: 700;">🔍 Open Focus Tab for this date</a>
         </div>
 
         <div class="tab-bar">
@@ -652,8 +656,7 @@ with tab_cal:
                         
                         html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}} ${{pastClass}}" 
                                      id="cell-${{mIdx}}-${{d}}"
-                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)"
-                                     ondblclick="openFocusTab('${{dateKey}}')">
+                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
                                      ${{d}}
                                </td>`;
                         currentDay++;
@@ -667,10 +670,6 @@ with tab_cal:
             grid.innerHTML = html;
         }}
 
-        function openFocusTab(dateKey) {{
-            window.parent.location.search = '?focus_date=' + dateKey;
-        }}
-
         function selectDate(mIdx, day, monthName, statusName, statusClass, element) {{
             document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
             if (element) element.classList.add('selected');
@@ -681,6 +680,12 @@ with tab_cal:
             badge.className = `status-badge ${{statusClass}}`;
 
             const dateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
+            
+            const btn = document.getElementById('focusLinkBtn');
+            btn.href = '?focus_date=' + dateKey;
+            btn.style.display = 'inline-block';
+            btn.innerText = `🔍 Open Focus Tab for ${{monthName}} ${{day}}, ${{YEAR}}`;
+
             const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
             
             const eventsTab = document.getElementById('eventsTab');
@@ -725,7 +730,7 @@ with tab_cal:
     </body>
     </html>
     """
-    components.html(calendar_html, height=690, scrolling=False)
+    components.html(calendar_html, height=695, scrolling=False)
 
 
 # =============================================================================
@@ -738,7 +743,7 @@ with tab_focus:
         st.markdown("""
         <div class="cashflow-card" style="text-align: center; padding: 40px;">
             <div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No Date Selected</div>
-            <div style="font-size: 13px; color: #94a3b8;">Go to the <b>Calendar & Schedule</b> tab and <b>double-click</b> on any date card to load its detailed focus view, upcoming week, and monthly summary here.</div>
+            <div style="font-size: 13px; color: #94a3b8;">Go to the <b>Calendar & Schedule</b> tab, click any date on the grid, and click the <b>"Open Focus Tab"</b> button that appears to load its detailed focus view here.</div>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -751,7 +756,6 @@ with tab_focus:
 
         st.markdown(f"<div class='section-header' style='margin-top:10px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
         
-        # 1. Current Day Details
         curr_data = live_data.get(focus_date_str, {"events": [], "bills": [], "status": "Working"})
         col_d1, col_d2 = st.columns(2)
         
@@ -780,9 +784,7 @@ with tab_focus:
             else:
                 st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No bills due today.</div>", unsafe_allow_html=True)
 
-        # 2. Upcoming Week (Next 7 Days)
         st.markdown("<div class='section-header' style='margin-top:24px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
-        week_container = st.container()
         week_cols = st.columns(7)
         
         for i in range(1, 8):
@@ -802,7 +804,6 @@ with tab_focus:
                 </div>
                 """, unsafe_allow_html=True)
 
-        # Expandable detailed view for the upcoming week
         with st.expander("🔍 View Detailed Schedule for Next 7 Days"):
             for i in range(1, 8):
                 future_dt = sel_dt + datetime.timedelta(days=i)
@@ -815,7 +816,6 @@ with tab_focus:
                     for b in f_data["bills"]:
                         st.markdown(f"<span style='color:#facc15; font-size:11px; margin-left:10px;'>• Bill: {b['title']}</span>", unsafe_allow_html=True)
 
-        # 3. Next Month Overview (Compact & Lightweight)
         st.markdown("<div class='section-header' style='margin-top:24px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
         
         month_events_summary = []
