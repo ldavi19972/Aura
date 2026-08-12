@@ -45,6 +45,11 @@ st.markdown("""
         display: none !important;
     }
 
+    /* Completely hide the date picker widget input from view while keeping it functional in Python state */
+    div[data-testid="stDateInput"] {
+        display: none !important;
+    }
+
     .section-header {
         font-size: 15px;
         color: #cbd5e1;
@@ -353,7 +358,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management
+# 4. State Management via URL Query Parameters
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today()
 
@@ -363,28 +368,47 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
+query_params = st.query_params
+if "tab" in query_params:
+    st.session_state["active_tab"] = query_params["tab"]
+if "focus_date" in query_params:
+    try:
+        st.session_state["focus_date"] = datetime.datetime.strptime(query_params["focus_date"], "%Y-%m-%d").date()
+    except:
+        pass
+    st.session_state["active_tab"] = "Focus"
+    st.query_params.clear()
+    st.rerun()
+
+focus_date_val = st.session_state["focus_date"]
+if isinstance(focus_date_val, datetime.date):
+    focus_date_str = focus_date_val.strftime("%Y-%m-%d")
+else:
+    focus_date_str = str(focus_date_val)
+
+current_tab = st.session_state["active_tab"]
+
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Bar (Your Original Style)
+# 5. Render Custom Navigation Bar
 # -----------------------------------------------------------------------------
-focus_date_str = st.session_state["focus_date"].strftime("%Y-%m-%d") if isinstance(st.session_state["focus_date"], datetime.date) else str(st.session_state["focus_date"])
 focus_label = f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View"
 
 col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
 
 with col_nav1:
-    is_cal_active = (st.session_state["active_tab"] == "Calendar")
+    is_cal_active = (current_tab == "Calendar")
     if st.button("📅  Calendar & Schedule", use_container_width=True, type="primary" if is_cal_active else "secondary"):
         st.session_state["active_tab"] = "Calendar"
         st.rerun()
 
 with col_nav2:
-    is_focus_active = (st.session_state["active_tab"] == "Focus")
+    is_focus_active = (current_tab == "Focus")
     if st.button(focus_label, use_container_width=True, type="primary" if is_focus_active else "secondary"):
         st.session_state["active_tab"] = "Focus"
         st.rerun()
 
 with col_nav3:
-    is_fin_active = (st.session_state["active_tab"] == "Finances")
+    is_fin_active = (current_tab == "Finances")
     if st.button("💰  Finances & Net Worth", use_container_width=True, type="primary" if is_fin_active else "secondary"):
         st.session_state["active_tab"] = "Finances"
         st.rerun()
@@ -394,7 +418,7 @@ st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 # =============================================================================
 # TAB 1: CALENDAR
 # =============================================================================
-if st.session_state["active_tab"] == "Calendar":
+if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     json_data = json.dumps(live_data)
 
@@ -475,7 +499,7 @@ if st.session_state["active_tab"] == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Single-click bottom preview • Use top navigation to switch views</div>
+            <div class="click-hint">💡 Single-click to preview bottom • Double-click to jump straight to Focus Tab</div>
         </div>
     </div>
 
@@ -546,7 +570,8 @@ if st.session_state["active_tab"] == "Calendar":
                         
                         html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}} ${{pastClass}}" 
                                      id="cell-${{mIdx}}-${{d}}"
-                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
+                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)"
+                                     ondblclick="doubleClickDate('${{dateKey}}')">
                                      ${{d}}
                                </td>`;
                         currentDay++;
@@ -597,6 +622,16 @@ if st.session_state["active_tab"] == "Calendar":
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
         }}
 
+        function doubleClickDate(dateKey) {{
+            // Cleanly navigates the top window out of the iframe sandbox to update the state
+            try {{
+                const targetUrl = window.top.location.origin + window.top.location.pathname + '?focus_date=' + dateKey + '&tab=Focus';
+                window.top.location.href = targetUrl;
+            }} catch (e) {{
+                window.parent.location.href = '?focus_date=' + dateKey + '&tab=Focus';
+            }}
+        }}
+
         function switchTab(tabId, btn) {{
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -620,21 +655,18 @@ if st.session_state["active_tab"] == "Calendar":
 # =============================================================================
 # TAB 2: FOCUS VIEW
 # =============================================================================
-elif st.session_state["active_tab"] == "Focus":
+elif current_tab == "Focus":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
-    # Built-in interactive date selector so you are never stuck on August 12
-    col_sel1, col_sel2 = st.columns([2, 4])
-    with col_sel1:
-        selected_focus_date = st.date_input("Select Focus Date", value=st.session_state["focus_date"])
-        if selected_focus_date != st.session_state["focus_date"]:
-            st.session_state["focus_date"] = selected_focus_date
-            st.rerun()
+    # Hidden functional date picker updating the state seamlessly behind the scenes
+    hidden_date_input = st.date_input("Hidden Focus Date", value=st.session_state["focus_date"], key="hidden_focus_picker")
+    if hidden_date_input != st.session_state["focus_date"]:
+        st.session_state["focus_date"] = hidden_date_input
+        st.rerun()
 
-    focus_date_str = st.session_state["focus_date"].strftime("%Y-%m-%d")
     sel_formatted = st.session_state["focus_date"].strftime("%A, %B %d, %Y")
 
-    st.markdown(f"<div class='section-header' style='margin-top:10px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header' style='margin-top:2px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
     
     curr_data = live_data.get(focus_date_str, {"events": [], "bills": [], "status": "Working"})
     col_d1, col_d2 = st.columns(2)
@@ -726,7 +758,7 @@ elif st.session_state["active_tab"] == "Focus":
 # =============================================================================
 # TAB 3: FINANCIAL DASHBOARD
 # =============================================================================
-elif st.session_state["active_tab"] == "Finances":
+elif current_tab == "Finances":
     fin = fetch_finances_data(FINANCES_URL)
 
     if fin:
