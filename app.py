@@ -396,11 +396,6 @@ if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     json_data = json.dumps(live_data)
 
-    today_date = datetime.date.today()
-    today_formatted = today_date.strftime("%A, %B %d, %Y")
-    today_m_idx = today_date.month - 1
-    today_d_num = today_date.day
-
     calendar_html = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -459,7 +454,7 @@ if current_tab == "Calendar":
 
     <div class="top-bar">
         <span class="today-badge">Today</span>
-        <span class="today-date-text">{today_formatted}</span>
+        <span class="today-date-text" id="todayText">Loading...</span>
     </div>
 
     <div class="calendar-container">
@@ -494,7 +489,15 @@ if current_tab == "Calendar":
 
     <script>
         const YEAR = 2026;
-        const TODAY = {{ month: {today_m_idx}, day: {today_d_num} }};
+        
+        // Dynamically fetch real live date from the browser's local clock
+        const now = new Date();
+        const TODAY = {{ month: now.getMonth(), day: now.getDate() }};
+        
+        // Format today's date string for top header
+        const options = {{ weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }};
+        document.getElementById('todayText').innerText = now.toLocaleDateString('en-US', options);
+
         const sheetData = {json_data};
 
         const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -603,7 +606,7 @@ if current_tab == "Calendar":
         }}
 
         renderGrid();
-        // Default preview to Today on load
+        // Automatically select and preview Today's live browser date on load
         setTimeout(() => {{
             const targetCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
             if (targetCell) {{
@@ -625,7 +628,7 @@ if current_tab == "Calendar":
 elif current_tab == "Focus":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
-    # Focus View automatically works off today's date
+    # Focus View works off real-time today's date
     focus_date_val = datetime.date.today()
     focus_date_str = focus_date_val.strftime("%Y-%m-%d")
     sel_formatted = focus_date_val.strftime("%A, %B %d, %Y")
