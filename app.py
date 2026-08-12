@@ -5,9 +5,9 @@ import json
 import datetime
 
 # -----------------------------------------------------------------------------
-# 1. Hardcoded Google Sheet Configuration
+# 1. Hardcoded Google Sheet Configuration (CalendarData Tab: gid=1456635855)
 # -----------------------------------------------------------------------------
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=528057576"
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=1456635855"
 
 # -----------------------------------------------------------------------------
 # 2. Page Configuration & Layout
@@ -49,15 +49,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 3. Google Sheets Data Fetching
+# 3. Google Sheets Data Fetching (CalendarData Tab)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=30)
-def load_raw_data_sheet(csv_url):
+def load_calendar_data_sheet(csv_url):
     """
-    Fetches and parses the 'Raw Data' tab directly from the hardcoded URL.
-    Handles columns: Date, Status, Bill 1..N, Event 1..N, Time 1..N, Location 1..N
+    Parses the tabular CalendarData sheet containing:
+    Columns: Date | Title | Time | Location | Category
     """
     data_map = {}
+
+    # Category hierarchy to determine cell color if multiple events exist on one date
+    category_priority = {
+        "Public Holiday": 5,
+        "Holiday": 4,
+        "Work Trip": 3,
+        "Get-away": 2,
+        "Working": 1
+    }
 
     try:
         df = pd.read_csv(csv_url)
@@ -68,78 +77,48 @@ def load_raw_data_sheet(csv_url):
             if not raw_date or raw_date.lower() == "nan":
                 continue
 
-            # Parse Australian date format (DD/MM/YYYY) into YYYY-MM-DD
+            # Ensure date is standard YYYY-MM-DD
             try:
-                date_obj = pd.to_datetime(raw_date, dayfirst=True)
+                date_obj = pd.to_datetime(raw_date)
                 date_key = date_obj.strftime("%Y-%m-%d")
             except Exception:
                 continue
 
+            title = str(row.get("Title", "")).replace("nan", "").strip()
+            time_val = str(row.get("Time", "")).replace("nan", "").strip()
+            location_val = str(row.get("Location", "")).replace("nan", "").strip()
+            category_val = str(row.get("Category", "Working")).replace("nan", "").strip()
+
+            if not category_val:
+                category_val = "Working"
+
             if date_key not in data_map:
                 data_map[date_key] = {
-                    "status": str(row.get("Status", "Working")).strip(),
+                    "status": category_val,
                     "events": [],
                     "bills": []
                 }
+            else:
+                # Update status if new event has a higher-priority category (e.g. Holiday over Working)
+                current_prio = category_priority.get(data_map[date_key]["status"], 0)
+                new_prio = category_priority.get(category_val, 0)
+                if new_prio > current_prio:
+                    data_map[date_key]["status"] = category_val
 
-            # Parse all Event columns (Event 1, Event 2, etc.) & linked Time/Location
-            event_cols = [c for c in df.columns if c.startswith("Event")]
-            for col in event_cols:
-                val = str(row.get(col, "")).replace("nan", "").strip()
-                if val:
-                    suffix = col.replace("Event", "").strip()
-                    
-                    # Look for corresponding Time column
-                    time_val = ""
-                    for t_col in [f"Time {suffix}", f"Event {suffix} Time", f"Time{suffix}", "Time"]:
-                        if t_col in df.columns and str(row.get(t_col, "")).replace("nan", "").strip():
-                            time_val = str(row.get(t_col, "")).replace("nan", "").strip()
-                            break
-
-                    # Look for corresponding Location/Address column
-                    loc_val = ""
-                    for l_col in [f"Location {suffix}", f"Event {suffix} Location", f"Address {suffix}", f"Location{suffix}", "Location", "Address"]:
-                        if l_col in df.columns and str(row.get(l_col, "")).replace("nan", "").strip():
-                            loc_val = str(row.get(l_col, "")).replace("nan", "").strip()
-                            break
-
-                    data_map[date_key]["events"].append({
-                        "title": val,
-                        "time": time_val,
-                        "location": loc_val
-                    })
-
-            # Parse all Bill columns (Bill 1, Bill 2, etc.) & linked Amount/Time
-            bill_cols = [c for c in df.columns if c.startswith("Bill")]
-            for col in bill_cols:
-                val = str(row.get(col, "")).replace("nan", "").strip()
-                if val:
-                    suffix = col.replace("Bill", "").strip()
-                    
-                    amt_val = ""
-                    for a_col in [f"Amount {suffix}", f"Bill {suffix} Amount", f"Amount{suffix}", "Amount"]:
-                        if a_col in df.columns and str(row.get(a_col, "")).replace("nan", "").strip():
-                            amt_val = str(row.get(a_col, "")).replace("nan", "").strip()
-                            break
-
-                    time_val = ""
-                    for t_col in [f"Time {suffix}", f"Bill {suffix} Time", "Time"]:
-                        if t_col in df.columns and str(row.get(t_col, "")).replace("nan", "").strip():
-                            time_val = str(row.get(t_col, "")).replace("nan", "").strip()
-                            break
-
-                    data_map[date_key]["bills"].append({
-                        "title": val,
-                        "amount": amt_val,
-                        "time": time_val
-                    })
+            if title:
+                data_map[date_key]["events"].append({
+                    "title": title,
+                    "time": time_val,
+                    "location": location_val,
+                    "category": category_val
+                })
 
     except Exception as e:
         st.error(f"Error fetching data from Google Sheets: {e}")
 
     return data_map
 
-live_data = load_raw_data_sheet(DEFAULT_SHEET_URL)
+live_data = load_calendar_data_sheet(DEFAULT_SHEET_URL)
 json_data = json.dumps(live_data)
 
 # Current Date Setup
@@ -277,7 +256,7 @@ calendar_html = f"""
         outline-offset: 1px;
     }}
 
-    /* Color Themes */
+    /* Color Themes matched to Category */
     .status-empty {{ background-color: #1a1e27; color: #475569; }}
     .status-working {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
     .status-public-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
@@ -379,14 +358,10 @@ calendar_html = f"""
         margin-bottom: 8px;
     }}
 
-    .data-card.bill {{
-        border-left-color: #f59e0b;
-    }}
-
     .card-meta {{
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
         margin-top: 6px;
         font-size: 11px;
     }}
@@ -405,7 +380,7 @@ calendar_html = f"""
         <span class="today-badge">Today</span>
         <span class="today-date-text">{today_formatted}</span>
     </div>
-    <div style="font-size: 12px; color: #64748b;">Raw Data Tab Sync • 2026</div>
+    <div style="font-size: 12px; color: #64748b;">CalendarData Sync • 2026</div>
 </div>
 
 <div class="calendar-container">
@@ -429,11 +404,9 @@ calendar_html = f"""
 
     <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('eventsTab', this)">Events & Schedule</button>
-        <button class="tab-btn" onclick="switchTab('billsTab', this)">Bills Due</button>
     </div>
 
     <div id="eventsTab" class="tab-content active"></div>
-    <div id="billsTab" class="tab-content"></div>
 </div>
 
 <script>
@@ -444,17 +417,14 @@ calendar_html = f"""
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    function getStaticStatus(monthIdx, day) {{
-        if (monthIdx === 7 && day >= 23 && day <= 29) return {{ class: 'status-holiday', name: 'Holiday' }};
-        if (monthIdx === 10 && day >= 16 && day <= 20) return {{ class: 'status-work-trip', name: 'Work Trip' }};
-        if (monthIdx === 10 && (day === 1 || day === 30)) return {{ class: 'status-get-away', name: 'Get-away' }};
-        if (monthIdx === 9 && (day === 30 || day === 31)) return {{ class: 'status-get-away', name: 'Get-away' }};
-        if (monthIdx === 0 && day === 1) return {{ class: 'status-public-holiday', name: 'Public Holiday' }};
-        
-        const dateObj = new Date(YEAR, monthIdx, day);
-        if (dateObj.getDay() === 0 || dateObj.getDay() === 6) return {{ class: 'status-empty', name: 'Weekend' }};
-        
-        return {{ class: 'status-working', name: 'Working' }};
+    function getCssClassForCategory(category) {{
+        switch(category) {{
+            case 'Holiday': return 'status-holiday';
+            case 'Work Trip': return 'status-work-trip';
+            case 'Get-away': return 'status-get-away';
+            case 'Public Holiday': return 'status-public-holiday';
+            default: return 'status-working';
+        }}
     }}
 
     function renderGrid() {{
@@ -480,16 +450,15 @@ calendar_html = f"""
                     const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
                     
                     const entry = sheetData[dateKey];
-                    const defaultStatus = getStaticStatus(mIdx, d);
-                    const statusName = (entry && entry.status && entry.status !== 'Working') ? entry.status : defaultStatus.name;
-                    const statusClass = defaultStatus.class;
+                    const categoryName = entry ? entry.status : 'Working';
+                    const statusClass = getCssClassForCategory(categoryName);
                     
                     const isToday = (mIdx === TODAY.month && d === TODAY.day);
                     const todayClass = isToday ? 'is-today' : '';
                     
                     html += `<td class="day-cell ${{statusClass}} ${{todayClass}}" 
                                  id="cell-${{mIdx}}-${{d}}"
-                                 onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{statusName}}', '${{statusClass}}', this)">
+                                 onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
                                  ${{dayLetter}}
                              </td>`;
                 }} else {{
@@ -517,7 +486,7 @@ calendar_html = f"""
         const dStr = String(day).padStart(2, '0');
         const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
 
-        const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
+        const dayData = sheetData[dateKey] || {{ events: [] }};
         
         // Render Events
         const eventsTab = document.getElementById('eventsTab');
@@ -539,27 +508,6 @@ calendar_html = f"""
                 `;
             }}).join('')
             : `<p style="color:#64748b;">No events recorded for this date.</p>`;
-
-        // Render Bills
-        const billsTab = document.getElementById('billsTab');
-        billsTab.innerHTML = dayData.bills.length > 0 
-            ? dayData.bills.map(b => {{
-                let metaHtml = '';
-                if (b.amount) {{
-                    metaHtml += `<span class="meta-item" style="color:#f59e0b; font-weight:600;">💰 ${{b.amount}}</span>`;
-                }}
-                if (b.time) {{
-                    metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{b.time}}</span>`;
-                }}
-
-                return `
-                    <div class="data-card bill">
-                        <div style="color:#fff; font-weight:600;">${{b.title}}</div>
-                        ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
-                    </div>
-                `;
-            }}).join('')
-            : `<p style="color:#64748b;">No bills recorded for this date.</p>`;
     }}
 
     function switchTab(tabId, btn) {{
