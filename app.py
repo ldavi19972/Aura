@@ -214,7 +214,7 @@ def fetch_finances_data(finances_url):
         return None
 
     fin_data = {
-        "kpis": {"savings": 4937.98, "credit": -26117.95, "assets": 3129.96, "net": -18050.01},
+        "kpis": {"savings": 3290.32, "credit": -26058.52, "assets": 3128.64, "net": -22929.88},
         "income": {"total_wk": 0.0, "salary_wk": 0.0, "transfers_wk": 0.0},
         "expenses": {"total_wk": 0.0, "fixed_wk": 0.0, "variable_wk": 0.0, "holiday_wk": 0.0},
         "net_flow": {"wk": 0.0, "mo": 0.0, "yr": 0.0},
@@ -225,6 +225,7 @@ def fetch_finances_data(finances_url):
         "assets": []
     }
 
+    # Extract direct KPI metrics from Net Worth block (Columns Q & R, rows 3-6)
     try:
         for r in range(len(df)):
             row_vals = [str(x).strip() for x in df.iloc[r].values]
@@ -299,14 +300,16 @@ def fetch_finances_data(finances_url):
         rate_val = spec["rate"]
         override_status = spec["status"]
 
-        for r in range(len(df)):
+        # Scans rows 26 to 31 for account transfer balances matching goal names
+        for r in range(26, min(32, len(df))):
             row_cells = [str(df.iloc[r, c]).strip() for c in range(len(df.columns))]
             for c, cell in enumerate(row_cells):
                 if cell.lower() == g_name.lower():
                     if c > 0 and clean_num(row_cells[c-1]) > 0:
                         bal_val = clean_num(row_cells[c-1])
 
-        if g_name == "Italy" and bal_val == 0.0: bal_val = 2850.00
+        # Fallback defaults if unindexed
+        if g_name == "Italy" and bal_val == 0.0: bal_val = 3290.32
         if g_name == "New Zealand" and bal_val == 0.0: bal_val = 2087.98
 
         pct = int((bal_val / target_val * 100)) if target_val > 0 else 0
@@ -754,7 +757,6 @@ elif current_tab == "Focus":
     # Center the remaining 2 days at the bottom using empty filler columns around them
     if remaining_days:
         rem_cols = st.columns(7)
-        # Place the 2 items in columns index 2 and 3 so they are neatly centered out of 7
         target_indices = [2, 3]
         for i, item in enumerate(remaining_days):
             col_idx = target_indices[i]
@@ -926,7 +928,7 @@ elif current_tab == "Finances":
             ])
             st.markdown(f'<div class="cashflow-card">{debt_rows}</div>', unsafe_allow_html=True)
 
-        with b_col2:
+        b_col2:
             st.markdown(f"<div class='section-header' style='margin-top:28px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</div>", unsafe_allow_html=True)
             asset_rows = "".join([
                 f'''<div class="cf-row">
