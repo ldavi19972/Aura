@@ -5,7 +5,7 @@ import json
 import datetime
 
 # -----------------------------------------------------------------------------
-# 1. Page Configuration & Full-Width Centered CSS
+# 1. Page Configuration & Layout
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Aura Calendar 2026",
@@ -16,7 +16,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Reset margins and force true full width without side scrolling */
+    /* Force full width and disable horizontal page scrolling */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0e1117 !important;
         margin: 0 !important;
@@ -44,33 +44,58 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. Top Google Sheet Sync Control
+# 2. Google Sheets Data Fetching (Targeting 'Raw Data' Tab)
 # -----------------------------------------------------------------------------
-st.sidebar.title("⚙️ Settings")
-sheet_url = st.sidebar.text_input(
-    "Google Sheet CSV URL",
-    placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv"
+st.sidebar.title("⚙️ Google Sheets Sync")
+sheet_id = st.sidebar.text_input(
+    "Google Sheet ID or Full CSV URL",
+    placeholder="528057576#gid=528057576",
+    help="Enter either your Google Sheet ID or full CSV URL for the 'Raw Data' tab."
 )
 
 @st.cache_data(ttl=30)
-def load_sheet_data(url):
-    """Parses Google Sheet CSV and extracts status colors + tab entries per date."""
+def load_raw_data_sheet(sheet_input):
+    """
+    Fetches and parses the 'Raw Data' tab from Google Sheets.
+    Handles columns: Date, Bill 1..N, Event 1..N, Status
+    """
     data_map = {}
-    if not url:
+    if not sheet_input:
         return data_map
 
+    # Construct direct CSV export URL for 'Raw Data' tab
+    if "docs.google.com" in sheet_input:
+        if "export?format=csv" in sheet_input:
+            csv_url = sheet_input
+        else:
+            # Extract Sheet ID from full URL
+            parts = sheet_input.split('/d/')
+            if len(parts) > 1:
+                s_id = parts[1].split('/')[0]
+                csv_url = f"https://docs.google.com/spreadsheets/d/{s_id}/gviz/tq?tqx=out:csv&sheet=Raw%20Data"
+            else:
+                csv_url = sheet_input
+    else:
+        # Standard Sheet ID input
+        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_input}/gviz/tq?tqx=out:csv&sheet=Raw%20Data"
+
     try:
-        df = pd.read_csv(url)
+        df = pd.read_csv(csv_url)
+        
+        # Strip whitespaces from column headers
+        df.columns = df.columns.str.strip()
+
         for _, row in df.iterrows():
             raw_date = str(row.get("Date", "")).strip()
             if not raw_date or raw_date.lower() == "nan":
                 continue
 
-            # Standardize date to YYYY-MM-DD
+            # Parse Australian date format (DD/MM/YYYY) into YYYY-MM-DD
             try:
-                date_key = pd.to_datetime(raw_date).strftime("%Y-%m-%d")
+                date_obj = pd.to_datetime(raw_date, dayfirst=True)
+                date_key = date_obj.strftime("%Y-%m-%d")
             except Exception:
-                date_key = raw_date
+                continue
 
             if date_key not in data_map:
                 data_map[date_key] = {
@@ -80,30 +105,33 @@ def load_sheet_data(url):
                     "notes": str(row.get("Notes", "")).replace("nan", "")
                 }
 
-            # Map Events
-            e_title = str(row.get("Event_Title", "")).replace("nan", "").strip()
-            if e_title:
-                data_map[date_key]["events"].append({
-                    "title": e_title,
-                    "time": str(row.get("Event_Time", "All Day")).replace("nan", "All Day")
-                })
+            # Parse all Bill columns (Bill 1, Bill 2, Bill 3, etc.)
+            bill_cols = [c for c in df.columns if c.startswith("Bill")]
+            for col in bill_cols:
+                val = str(row.get(col, "")).replace("nan", "").strip()
+                if val:
+                    data_map[date_key]["bills"].append({
+                        "title": val,
+                        "amount": "",
+                        "due": "Due Today"
+                    })
 
-            # Map Bills
-            b_title = str(row.get("Bill_Title", "")).replace("nan", "").strip()
-            if b_title:
-                data_map[date_key]["bills"].append({
-                    "title": b_title,
-                    "amount": str(row.get("Bill_Amount", "")).replace("nan", "$0.00"),
-                    "due": "Due Today"
-                })
+            # Parse all Event columns (Event 1, Event 2, Event 3, etc.)
+            event_cols = [c for c in df.columns if c.startswith("Event")]
+            for col in event_cols:
+                val = str(row.get(col, "")).replace("nan", "").strip()
+                if val:
+                    data_map[date_key]["events"].append({
+                        "title": val,
+                        "time": "Scheduled"
+                    })
 
     except Exception as e:
-        st.sidebar.error(f"Error loading Google Sheet: {e}")
+        st.sidebar.error(f"Error reading 'Raw Data' tab: {e}")
 
     return data_map
 
-# Load dynamic data
-live_data = load_sheet_data(sheet_url)
+live_data = load_raw_data_sheet(sheet_id)
 json_data = json.dumps(live_data)
 
 # Current Date Setup
@@ -113,7 +141,7 @@ today_m_idx = today_date.month - 1
 today_d_num = today_date.day
 
 # -----------------------------------------------------------------------------
-# 3. Responsive Responsive Calendar Grid Component
+# 3. HTML / JS Calendar Interface
 # -----------------------------------------------------------------------------
 calendar_html = f"""
 <!DOCTYPE html>
@@ -167,7 +195,6 @@ calendar_html = f"""
         margin-left: 8px;
     }}
 
-    /* Grid Layout Container - Centered and Non-scrolling */
     .calendar-container {{
         background: #161a22;
         border: 1px solid #222734;
@@ -179,7 +206,7 @@ calendar_html = f"""
 
     table.cal-grid {{
         width: 100%;
-        table-layout: fixed; /* Ensures strict proportional scaling across width */
+        table-layout: fixed;
         border-collapse: separate;
         border-spacing: 2px;
     }}
@@ -211,7 +238,6 @@ calendar_html = f"""
         text-overflow: ellipsis;
     }}
 
-    /* Calendar Day Cells */
     .day-cell {{
         height: 28px;
         width: 2.9%;
@@ -224,6 +250,7 @@ calendar_html = f"""
         user-select: none;
         vertical-align: middle;
         border: 1px solid transparent;
+        position: relative;
     }}
 
     .day-cell:hover {{
@@ -242,7 +269,7 @@ calendar_html = f"""
         outline-offset: 1px;
     }}
 
-    /* Dynamic Status Color Themes */
+    /* Color Themes */
     .status-empty {{ background-color: #1a1e27; color: #475569; }}
     .status-working {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
     .status-public-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
@@ -250,7 +277,6 @@ calendar_html = f"""
     .status-get-away {{ background-color: #422006; color: #facc15; border-color: #713f12; }}
     .status-work-trip {{ background-color: #3b0764; color: #c084fc; border-color: #6b21a8; }}
 
-    /* Legend Bar */
     .legend-bar {{
         display: flex;
         gap: 10px;
@@ -276,7 +302,6 @@ calendar_html = f"""
         border-radius: 2px;
     }}
 
-    /* Detail Panel */
     .detail-panel {{
         margin-top: 12px;
         background: #161a22;
@@ -358,7 +383,7 @@ calendar_html = f"""
         <span class="today-badge">Today</span>
         <span class="today-date-text">{today_formatted}</span>
     </div>
-    <div style="font-size: 12px; color: #64748b;">Aura Live Schedule • 2026</div>
+    <div style="font-size: 12px; color: #64748b;">Raw Data Tab Sync • 2026</div>
 </div>
 
 <div class="calendar-container">
@@ -399,15 +424,17 @@ calendar_html = f"""
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    function getStatusClass(statusName) {{
-        if (!statusName) return 'status-empty';
-        const s = statusName.toLowerCase().replace(/[^a-z]/g, '');
-        if (s.includes('publicholiday')) return 'status-public-holiday';
-        if (s.includes('holiday')) return 'status-holiday';
-        if (s.includes('getaway')) return 'status-get-away';
-        if (s.includes('worktrip')) return 'status-work-trip';
-        if (s.includes('working') || s.includes('work')) return 'status-working';
-        return 'status-empty';
+    function getStaticStatus(monthIdx, day) {{
+        if (monthIdx === 7 && day >= 23 && day <= 29) return {{ class: 'status-holiday', name: 'Holiday' }};
+        if (monthIdx === 10 && day >= 16 && day <= 20) return {{ class: 'status-work-trip', name: 'Work Trip' }};
+        if (monthIdx === 10 && (day === 1 || day === 30)) return {{ class: 'status-get-away', name: 'Get-away' }};
+        if (monthIdx === 9 && (day === 30 || day === 31)) return {{ class: 'status-get-away', name: 'Get-away' }};
+        if (monthIdx === 0 && day === 1) return {{ class: 'status-public-holiday', name: 'Public Holiday' }};
+        
+        const dateObj = new Date(YEAR, monthIdx, day);
+        if (dateObj.getDay() === 0 || dateObj.getDay() === 6) return {{ class: 'status-empty', name: 'Weekend' }};
+        
+        return {{ class: 'status-working', name: 'Working' }};
     }}
 
     function renderGrid() {{
@@ -433,8 +460,9 @@ calendar_html = f"""
                     const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
                     
                     const entry = sheetData[dateKey];
-                    const statusName = entry ? entry.status : ((dateObj.getDay() === 0 || dateObj.getDay() === 6) ? 'Weekend' : 'Working');
-                    const statusClass = getStatusClass(statusName);
+                    const defaultStatus = getStaticStatus(mIdx, d);
+                    const statusName = (entry && entry.status && entry.status !== 'Working') ? entry.status : defaultStatus.name;
+                    const statusClass = defaultStatus.class;
                     
                     const isToday = (mIdx === TODAY.month && d === TODAY.day);
                     const todayClass = isToday ? 'is-today' : '';
@@ -444,7 +472,7 @@ calendar_html = f"""
                                  onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{statusName}}', '${{statusClass}}', this)">
                                  ${{dayLetter}}
                              </td>`;
-                } else {{
+                }} else {{
                     html += '<td style="background:transparent;"></td>';
                 }}
             }}
@@ -471,19 +499,18 @@ calendar_html = f"""
 
         const dayData = sheetData[dateKey] || {{ events: [], bills: [], notes: '' }};
         
-        // Render Tab Data
         const eventsTab = document.getElementById('eventsTab');
         eventsTab.innerHTML = dayData.events.length > 0 
-            ? dayData.events.map(e => `<div class="data-card"><div style="color:#fff;font-weight:600;">${{e.title}}</div><div style="color:#64748b;font-size:11px;">🕒 ${{e.time}}</div></div>`).join('')
-            : `<p style="color:#64748b;">No events recorded in Google Sheet.</p>`;
+            ? dayData.events.map(e => `<div class="data-card"><div style="color:#fff;font-weight:600;">${{e.title}}</div></div>`).join('')
+            : `<p style="color:#64748b;">No events recorded in Raw Data tab for this date.</p>`;
 
         const billsTab = document.getElementById('billsTab');
         billsTab.innerHTML = dayData.bills.length > 0 
-            ? dayData.bills.map(b => `<div class="data-card bill"><div style="color:#fff;font-weight:600;">${{b.title}} — <span style="color:#f59e0b;">${{b.amount}}</span></div></div>`).join('')
-            : `<p style="color:#64748b;">No bills recorded in Google Sheet.</p>`;
+            ? dayData.bills.map(b => `<div class="data-card bill"><div style="color:#fff;font-weight:600;">${{b.title}}</div></div>`).join('')
+            : `<p style="color:#64748b;">No bills recorded in Raw Data tab for this date.</p>`;
 
         const notesTab = document.getElementById('notesTab');
-        notesTab.innerHTML = `<p style="color:#94a3b8;">${{dayData.notes || 'No notes for this date.'}}</p>`;
+        notesTab.innerHTML = `<p style="color:#94a3b8;">${{dayData.notes || 'No notes found for this date.'}}</p>`;
     }}
 
     function switchTab(tabId, btn) {{
