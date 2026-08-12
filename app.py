@@ -353,7 +353,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management & Query Parameter Synchronization
+# 4. State Management
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today()
 
@@ -363,6 +363,7 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
+# We use Streamlit query parameters cleanly and safely for date selection bridge
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
@@ -371,8 +372,6 @@ if "preview_date" in query_params:
         st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
     except:
         pass
-    st.query_params.clear()
-    st.rerun()
 
 focus_date_val = st.session_state["focus_date"]
 focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_val, datetime.date) else str(focus_date_val)
@@ -610,13 +609,12 @@ if current_tab == "Calendar":
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
 
-            // Reliable cross-frame navigation fallback for Streamlit sandbox
-            try {{
-                const targetUrl = window.parent.location.origin + window.parent.location.pathname + '?preview_date=' + dateKey;
-                window.parent.location.href = targetUrl;
-            }} catch(e) {{
-                window.location.href = '?preview_date=' + dateKey;
-            }}
+            // Safely update app via URL search params without opening new tabs or windows
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + "?preview_date=" + dateKey;
+            window.history.replaceState({{}}, '', newUrl);
+            
+            // Trigger Streamlit reload via fetch to sync session state cleanly
+            fetch(newUrl).catch(() => {{}});
         }}
 
         function switchTab(tabId, btn) {{
