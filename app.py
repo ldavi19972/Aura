@@ -5,9 +5,10 @@ import json
 import datetime
 
 # -----------------------------------------------------------------------------
-# 1. Google Sheet Configuration (Raw Data Tab: gid=0)
+# 1. Google Sheet Endpoints
 # -----------------------------------------------------------------------------
-RAW_DATA_SHEET_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=0"
+CALENDAR_DATA_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=1456635855"
+RAW_DATA_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=528057576"
 
 # -----------------------------------------------------------------------------
 # 2. Page Configuration & Layout
@@ -49,60 +50,94 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 3. Google Sheets Data Fetching (Raw Data Tab)
+# 3. Fetch & Merge Data from Both Tabs
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=30)
-def load_raw_calendar_sheet(csv_url):
+def fetch_combined_data(calendar_url, raw_url):
     data_map = {}
 
-    try:
-        df = pd.read_csv(csv_url)
-        df.columns = df.columns.str.strip()
+    category_priority = {
+        "Public Holiday": 5,
+        "Holiday": 4,
+        "Work Trip": 3,
+        "Get-away": 2,
+        "Working": 1
+    }
 
-        for _, row in df.iterrows():
+    # 1. Load Events from CalendarData tab
+    try:
+        df_cal = pd.read_csv(calendar_url)
+        df_cal.columns = df_cal.columns.str.strip()
+
+        for _, row in df_cal.iterrows():
             raw_date = str(row.get("Date", "")).strip()
             if not raw_date or raw_date.lower() == "nan":
                 continue
 
             try:
-                # Dates in Raw Data are formatted as DD/MM/YYYY
+                date_obj = pd.to_datetime(raw_date)
+                date_key = date_obj.strftime("%Y-%m-%d")
+            except Exception:
+                continue
+
+            title = str(row.get("Title", "")).replace("nan", "").strip()
+            time_val = str(row.get("Time", "")).replace("nan", "").strip()
+            location_val = str(row.get("Location", "")).replace("nan", "").strip()
+            category_val = str(row.get("Category", "Working")).replace("nan", "").strip()
+
+            if not category_val:
+                category_val = "Working"
+
+            if date_key not in data_map:
+                data_map[date_key] = {"status": category_val, "events": [], "bills": []}
+            else:
+                current_prio = category_priority.get(data_map[date_key]["status"], 0)
+                new_prio = category_priority.get(category_val, 0)
+                if new_prio > current_prio:
+                    data_map[date_key]["status"] = category_val
+
+            if title:
+                data_map[date_key]["events"].append({
+                    "title": title,
+                    "time": time_val,
+                    "location": location_val,
+                    "category": category_val
+                })
+    except Exception as e:
+        st.error(f"Error fetching CalendarData tab: {e}")
+
+    # 2. Load Bills from Raw Data tab
+    try:
+        df_raw = pd.read_csv(raw_url)
+        df_raw.columns = df_raw.columns.str.strip()
+
+        for _, row in df_raw.iterrows():
+            raw_date = str(row.get("Date", "")).strip()
+            if not raw_date or raw_date.lower() == "nan":
+                continue
+
+            try:
                 date_obj = pd.to_datetime(raw_date, dayfirst=True)
                 date_key = date_obj.strftime("%Y-%m-%d")
             except Exception:
                 continue
 
             if date_key not in data_map:
-                data_map[date_key] = {
-                    "status": "Working",
-                    "events": [],
-                    "bills": []
-                }
+                data_map[date_key] = {"status": "Working", "events": [], "bills": []}
 
-            # Extract Bills (Bill 1 .. Bill 5)
-            for col in df.columns:
+            # Check Bill 1 through Bill 5 columns
+            for col in df_raw.columns:
                 if col.lower().startswith("bill"):
                     val = str(row.get(col, "")).replace("nan", "").strip()
                     if val:
                         data_map[date_key]["bills"].append({"title": val})
 
-            # Extract Events (Event 1 .. Event 5)
-            for col in df.columns:
-                if col.lower().startswith("event"):
-                    val = str(row.get(col, "")).replace("nan", "").strip()
-                    if val:
-                        data_map[date_key]["events"].append({"title": val})
-
-            # Handle optional Category if present in raw sheet
-            category_val = str(row.get("Category", "Working")).replace("nan", "").strip()
-            if category_val:
-                data_map[date_key]["status"] = category_val
-
     except Exception as e:
-        st.error(f"Error fetching data from Raw Data tab: {e}")
+        st.error(f"Error fetching Raw Data tab: {e}")
 
     return data_map
 
-live_data = load_raw_calendar_sheet(RAW_DATA_SHEET_URL)
+live_data = fetch_combined_data(CALENDAR_DATA_URL, RAW_DATA_URL)
 json_data = json.dumps(live_data)
 
 # Current Date Setup
@@ -348,6 +383,20 @@ calendar_html = f"""
     .bill-card {{
         border-left-color: #facc15;
     }}
+
+    .card-meta {{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 6px;
+        font-size: 11px;
+    }}
+
+    .meta-item {{
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }}
 </style>
 </head>
 <body>
@@ -357,7 +406,7 @@ calendar_html = f"""
         <span class="today-badge">Today</span>
         <span class="today-date-text">{today_formatted}</span>
     </div>
-    <div style="font-size: 12px; color: #64748b;">Raw Data Sync • 2026</div>
+    <div style="font-size: 12px; color: #64748b;">Live Sheet Sync • 2026</div>
 </div>
 
 <div class="calendar-container">
@@ -481,11 +530,18 @@ calendar_html = f"""
         const eventsTab = document.getElementById('eventsTab');
         const eventsList = dayData.events || [];
         eventsTab.innerHTML = eventsList.length > 0 
-            ? eventsList.map(e => `
-                <div class="data-card">
-                    <div style="color:#fff; font-weight:600;">${{e.title}}</div>
-                </div>
-            `).join('')
+            ? eventsList.map(e => {{
+                let metaHtml = '';
+                if (e.time) metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>`;
+                if (e.location) metaHtml += `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>`;
+                
+                return `
+                    <div class="data-card">
+                        <div style="color:#fff; font-weight:600;">${{e.title}}</div>
+                        ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
+                    </div>
+                `;
+            }}).join('')
             : `<p style="color:#64748b;">No events recorded for this date.</p>`;
 
         // Render Bills
