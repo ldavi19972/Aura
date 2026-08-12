@@ -130,10 +130,10 @@ st.markdown("""
 
     .stExpander [data-testid="stExpanderDetails"] {
         background-color: #161a22 !important;
-        padding: 8px 10px 14px 10px !important;
+        padding: 8px 10px 16px 10px !important;
         border-top: 1px solid #222734 !important;
-        min-height: 45px;
-        max-height: 250px;
+        min-height: 55px;
+        max-height: 280px;
         overflow-y: auto;
     }
     
@@ -717,7 +717,7 @@ elif current_tab == "Focus":
                 else:
                     st.markdown("<div style='color:#64748b; font-size:11px; min-height: 25px;'>No events or bills.</div>", unsafe_allow_html=True)
 
-    # Redesigned Month Overview View (Days 8 to 37) in a compact 5-per-row grid format
+    # Redesigned Month Overview View (Days 8 to 37) in a compact 5-per-row grid format using native markdown safely
     st.markdown("<div class='section-header' style='margin-top:28px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
     
     month_events_list = []
@@ -733,22 +733,22 @@ elif current_tab == "Focus":
             })
 
     if month_events_list:
-        # Group items into rows of 5 columns to emulate a compact monthly date picker layout
         rows = [month_events_list[idx:idx + 5] for idx in range(0, len(month_events_list), 5)]
         for row in rows:
             cols = st.columns(5)
             for idx, item in enumerate(row):
                 with cols[idx]:
-                    ev_tags = "".join([f"<div style='color:#38bdf8; font-size:10px; margin-top:2px; line-height:1.2;'>📅 {ev}</div>" for ev in item["events"]])
-                    bi_tags = "".join([f"<div style='color:#facc15; font-size:10px; margin-top:2px; line-height:1.2;'>💸 {bi}</div>" for bi in item["bills"]])
+                    content_inner = f"<div style='font-weight:700; color:#e2e8f0; font-size:11px; border-bottom:1px solid #222734; padding-bottom:2px; margin-bottom:3px;'>{item['date_str']}</div>"
+                    for ev in item["events"]:
+                        content_inner += f"<div style='color:#38bdf8; font-size:10px; margin-top:2px; line-height:1.2;'>📅 {ev}</div>"
+                    for bi in item["bills"]:
+                        content_inner += f"<div style='color:#facc15; font-size:10px; margin-top:2px; line-height:1.2;'>💸 {bi}</div>"
+                    
                     st.markdown(f"""
                     <div style="background:#161a22; border:1px solid #222734; border-radius:8px; padding:8px; height:105px; overflow-y:auto; margin-bottom:6px;">
-                        <div style="font-weight:700; color:#e2e8f0; font-size:11px; border-bottom:1px solid #222734; padding-bottom:2px; margin-bottom:3px;">{item["date_str"]}</div>
-                        {ev_tags}
-                        {bi_tags}
+                        {content_inner}
                     </div>
                     """, unsafe_allow_html=True)
-            # Empty filler columns if a row has fewer than 5 items
             for idx in range(len(row), 5):
                 with cols[idx]:
                     st.markdown("", unsafe_allow_html=True)
