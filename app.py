@@ -387,7 +387,7 @@ def fetch_finances_data(finances_url):
 
 
 # -----------------------------------------------------------------------------
-# 4. State & Query Parameters Management
+# 4. State & Query Parameters Management (The Fix)
 # -----------------------------------------------------------------------------
 if "focus_date" not in st.session_state:
     st.session_state["focus_date"] = ""
@@ -400,6 +400,7 @@ if "focus_date" in st.query_params:
     st.session_state["focus_date"] = st.query_params["focus_date"]
     st.session_state["trigger_tab_switch"] = True
     st.query_params.clear()
+    st.rerun() # Stop execution and restart cleanly to fully register the state
 
 focus_date_str = st.session_state["focus_date"]
 
@@ -620,8 +621,7 @@ with tab_cal:
         }}
 
         function doubleClickDate(dateKey) {{
-            // CREATES A HIDDEN LINK TO FORCE THE *MAIN* WINDOW TO UPDATE
-            // This physically stops the iframe from loading a website-within-a-website
+            // Cleanly changes the MAIN window URL so the inception bug cannot happen
             const anchor = document.createElement('a');
             anchor.href = '?focus_date=' + dateKey;
             anchor.target = '_parent';
@@ -926,21 +926,37 @@ with tab_fin:
     else:
         st.warning("Unable to fetch financial data from Google Sheets.")
 
+
 # =============================================================================
-# 6. Tab Auto-Switcher (Runs silently in the background)
+# 6. Tab Auto-Switcher (The Reliable Polling Fix)
 # =============================================================================
-# If we just registered a double click, we trigger an invisible script to click the Focus tab.
+# If we just registered a double click, we trigger an invisible polling script 
+# that waits patiently for the tabs to render, then clicks the Focus Tab.
 if st.session_state.get("trigger_tab_switch"):
     st.session_state["trigger_tab_switch"] = False
     
     components.html("""
     <script>
-        setTimeout(function() {
-            // Find all tabs on the main window and click the second one (Focus View)
-            const tabs = window.parent.document.querySelectorAll('[data-baseweb="tab"]');
-            if (tabs && tabs.length >= 2) {
-                tabs[1].click();
+        let attempts = 0;
+        const clickInterval = setInterval(function() {
+            try {
+                // Look up to the main Streamlit browser window to find the tabs
+                const tabs = window.parent.document.querySelectorAll('[data-baseweb="tab"]');
+                
+                // If it finds them, click the Focus View tab (index 1) and stop checking
+                if (tabs && tabs.length >= 2) {
+                    tabs[1].click();
+                    clearInterval(clickInterval);
+                }
+            } catch (e) {
+                // Fails silently if it checks too early
             }
-        }, 150); 
+            
+            attempts++;
+            // Stop trying after 2.5 seconds so it doesn't run forever
+            if (attempts > 50) {
+                clearInterval(clickInterval);
+            }
+        }, 50); // Checks every 50 milliseconds
     </script>
     """, height=0, width=0)
