@@ -353,7 +353,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management with Streamlit Native Buttons & Query Parameters
+# 4. State Management
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today()
 
@@ -363,7 +363,7 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-# Check URL arguments for instant cross-tab switching from double-click
+# Handle communication from the calendar component via query params
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
@@ -372,16 +372,10 @@ if "focus_date" in query_params:
         st.session_state["focus_date"] = datetime.datetime.strptime(query_params["focus_date"], "%Y-%m-%d").date()
     except:
         pass
-    st.session_state["active_tab"] = "Focus"
     st.query_params.clear()
-    st.rerun()
 
 focus_date_val = st.session_state["focus_date"]
-if isinstance(focus_date_val, datetime.date):
-    focus_date_str = focus_date_val.strftime("%Y-%m-%d")
-else:
-    focus_date_str = str(focus_date_val)
-
+focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_val, datetime.date) else str(focus_date_val)
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
@@ -412,59 +406,252 @@ with col_nav3:
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
 # =============================================================================
-# TAB 1: CALENDAR (Native Streamlit Buttons for 100% Reliable Double-Click)
+# TAB 1: CALENDAR (Original Gorgeous HTML Grid with Preview Action Button)
 # =============================================================================
 if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
-    
+    json_data = json.dumps(live_data)
+
     today_date = datetime.date.today()
     today_formatted = today_date.strftime("%A, %B %d, %Y")
+    today_m_idx = today_date.month - 1
+    today_d_num = today_date.day
 
-    st.markdown(f"""
-    <div style="display: inline-flex; align-items: center; background: #161a22; border: 1px solid #222734; border-radius: 8px; padding: 6px 12px; margin-bottom: 8px;">
-        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 2px 6px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Today</span>
-        <span style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-left: 8px;">{today_formatted}</span>
+    calendar_html = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }}
+        body {{ background-color: #0e1117; color: #f1f5f9; width: 100%; height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 0; }}
+        .top-bar {{ display: inline-flex; align-items: center; align-self: flex-start; background: #161a22; border: 1px solid #222734; border-radius: 8px; padding: 6px 12px; margin-bottom: 6px; }}
+        .today-badge {{ background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 2px 6px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; }}
+        .today-date-text {{ font-size: 14px; font-weight: 700; color: #f8fafc; margin-left: 8px; }}
+        .calendar-container {{ background: #161a22; border: 1px solid #222734; border-radius: 10px; padding: 8px 12px; width: 100%; margin: 0 auto; }}
+        table.cal-grid {{ width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 2px; }}
+        th.col-header {{ color: #94a3b8; font-size: 10px; font-weight: 700; text-align: center; padding: 2px 0; width: 2.4%; }}
+        th.col-header-first {{ width: 8%; text-align: left; padding-left: 4px; color: #cbd5e1; font-size: 12px; }}
+        td.month-label {{ color: #94a3b8; font-size: 11px; font-weight: 600; padding: 2px 4px; white-space: nowrap; text-align: left; width: 8%; overflow: hidden; text-overflow: ellipsis; }}
+        .day-cell {{ height: 26px; width: 2.4%; border-radius: 4px; text-align: center; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.1s ease; user-select: none; vertical-align: middle; border: 1px solid transparent; position: relative; }}
+        .day-cell:hover {{ transform: scale(1.12); border-color: #ffffff99 !important; z-index: 10; }}
+        .day-cell.is-today {{ box-shadow: 0 0 0 2px #38bdf8, 0 0 8px rgba(56, 189, 248, 0.6) !important; border-color: #38bdf8 !important; }}
+        .day-cell.selected {{ outline: 2px solid #ffffff; outline-offset: 1px; }}
+        .status-empty {{ background-color: transparent; border: none; cursor: default; }}
+        
+        .day-cell.is-past.status-working {{ background-color: #0b2213 !important; color: #23633d !important; border-color: #0e331b !important; }}
+        .day-cell.is-past.status-public-holiday {{ background-color: #112244 !important; color: #2d558c !important; border-color: #142a52 !important; }}
+        .day-cell.is-past.status-holiday {{ background-color: #2b030f !important; color: #823043 !important; border-color: #4a061a !important; }}
+        .day-cell.is-past.status-get-away {{ background-color: #261303 !important; color: #876219 !important; border-color: #452105 !important; }}
+        .day-cell.is-past.status-work-trip {{ background-color: #23043d !important; color: #6d4791 !important; border-color: #3d076b !important; }}
+
+        .status-working {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
+        .status-public-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
+        .status-holiday {{ background-color: #4c0519; color: #fb7185; border-color: #9f1239; }}
+        .status-get-away {{ background-color: #422006; color: #facc15; border-color: #713f12; }}
+        .status-work-trip {{ background-color: #3b0764; color: #c084fc; border-color: #6b21a8; }}
+
+        .legend-bar {{ display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }}
+        .legend-item {{ display: flex; align-items: center; gap: 5px; font-size: 10px; color: #94a3b8; background: #1a1e27; padding: 2px 6px; border-radius: 4px; border: 1px solid #28303f; }}
+        .legend-dot {{ width: 7px; height: 7px; border-radius: 2px; }}
+        .detail-panel {{ margin-top: 8px; background: #161a22; border: 1px solid #222734; border-radius: 10px; padding: 10px 14px; width: 100%; }}
+        .panel-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }}
+        .panel-title {{ font-size: 14px; font-weight: 700; color: #f8fafc; }}
+        .status-badge {{ font-size: 10px; padding: 2px 6px; border-radius: 8px; font-weight: 600; }}
+        .tab-bar {{ display: flex; gap: 8px; border-bottom: 1px solid #222734; margin-bottom: 8px; }}
+        .tab-btn {{ background: none; border: none; color: #64748b; font-size: 11px; font-weight: 600; padding: 3px 8px; cursor: pointer; border-bottom: 2px solid transparent; }}
+        .tab-btn.active {{ color: #38bdf8; border-bottom-color: #38bdf8; }}
+        .tab-content {{ display: none; color: #94a3b8; font-size: 12px; }}
+        .tab-content.active {{ display: block; }}
+        .data-card {{ background: #1c212c; border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; }}
+        .bill-card {{ border-left-color: #facc15; }}
+        .card-meta {{ display: flex; align-items: center; gap: 12px; margin-top: 2px; font-size: 11px; }}
+        .meta-item {{ display: flex; align-items: center; gap: 4px; }}
+        .click-hint {{ font-size: 10px; color: #38bdf8; margin-top: 6px; text-align: right; }}
+    </style>
+    </head>
+    <body>
+
+    <div class="top-bar">
+        <span class="today-badge">Today</span>
+        <span class="today-date-text">{today_formatted}</span>
     </div>
-    """, unsafe_allow_html=True)
 
-    # We use native Streamlit buttons laid out in a clean yearly grid setup to bypass browser iframe sandbox restrictions completely
-    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-    days_in_months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    
-    st.markdown("""
-    <div style="background: #161a22; border: 1px solid #222734; border-radius: 10px; padding: 12px; width: 100%;">
-        <div style="font-size: 11px; color: #38bdf8; margin-bottom: 8px; font-weight: 600;">
-            ⚡ Click any date below to instantly jump to its Focus View.
+    <div class="calendar-container">
+        <table class="cal-grid" id="calendarGrid"></table>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="legend-bar">
+                <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>Working</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>Public Holiday</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#fb7185"></div>Holiday</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#facc15"></div>Get-away</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
+            </div>
+            <div class="click-hint">💡 Click any date to preview details below</div>
         </div>
-    """, unsafe_allow_html=True)
+    </div>
 
-    # Render interactive month rows using native buttons so state updates instantly without iframe blocks
-    for m_idx, m_name in enumerate(months):
-        cols = st.columns([1.2] + [1] * 31)
-        with cols[0]:
-            st.markdown(f"<div style='font-size:11px; font-weight:600; color:#94a3b8; padding-top:4px;'>{m_name}</div>", unsafe_allow_html=True)
-        
-        total_days = days_in_months[m_idx]
-        offset = (datetime.date(2026, m_idx + 1, 1).weekday() - 1) % 7 # align days nicely
-        
-        for d in range(1, 32):
-            with cols[d]:
-                if d <= total_days:
-                    date_obj = datetime.date(2026, m_idx + 1, d)
-                    date_key = date_obj.strftime("%Y-%m-%d")
-                    entry = live_data.get(date_key, {"status": "Working"})
-                    status_cat = entry.get("status", "Working")
-                    
-                    # Button color styling based on status
-                    btn_label = str(d)
-                    if st.button(btn_label, key=f"cal_btn_{m_idx}_{d}", use_container_width=True):
-                        st.session_state["focus_date"] = date_obj
-                        st.session_state["active_tab"] = "Focus"
-                        st.rerun()
-                else:
-                    st.markdown("", unsafe_allow_html=True)
+    <div class="detail-panel">
+        <div class="panel-header">
+            <div class="panel-title" id="selectedDateTitle">Select a date</div>
+            <div class="status-badge status-working" id="selectedStatusBadge">Working</div>
+        </div>
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('eventsTab', this)">Events & Schedule</button>
+            <button class="tab-btn" onclick="switchTab('billsTab', this)">Bills</button>
+        </div>
+
+        <div id="eventsTab" class="tab-content active"></div>
+        <div id="billsTab" class="tab-content"></div>
+    </div>
+
+    <script>
+        const YEAR = 2026;
+        const TODAY = {{ month: {today_m_idx}, day: {today_d_num} }};
+        const sheetData = {json_data};
+
+        const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const dayLetters = ["T", "W", "T", "F", "S", "S", "M"]; 
+        const TOTAL_GRID_COLS = 37;
+
+        function getCssClassForCategory(category) {{
+            switch(category) {{
+                case 'Holiday': return 'status-holiday';
+                case 'Work Trip': return 'status-work-trip';
+                case 'Get-away': return 'status-get-away';
+                case 'Public Holiday': return 'status-public-holiday';
+                default: return 'status-working';
+            }}
+        }}
+
+        function isPastDate(mIdx, d) {{
+            if (mIdx < TODAY.month) return true;
+            if (mIdx === TODAY.month && d < TODAY.day) return true;
+            return false;
+        }}
+
+        function renderGrid() {{
+            const grid = document.getElementById('calendarGrid');
+            let html = '<thead><tr><th class="col-header-first">2026</th>';
+            for (let col = 0; col < TOTAL_GRID_COLS; col++) {{
+                html += `<th class="col-header">${{dayLetters[col % 7]}}</th>`;
+            }}
+            html += '</tr></thead><tbody>';
+
+            months.forEach((mName, mIdx) => {{
+                html += `<tr><td class="month-label">${{mName}}</td>`;
+                const totalDays = daysInMonths[mIdx];
+                const offset = (new Date(YEAR, mIdx, 1).getDay() - 2 + 7) % 7; 
+                let currentDay = 1;
+
+                for (let col = 0; col < TOTAL_GRID_COLS; col++) {{
+                    if (col >= offset && currentDay <= totalDays) {{
+                        const d = currentDay;
+                        const dateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(d).padStart(2, '0')}}`;
+                        const entry = sheetData[dateKey];
+                        const categoryName = entry ? entry.status : 'Working';
+                        const statusClass = getCssClassForCategory(categoryName);
+                        const isToday = (mIdx === TODAY.month && d === TODAY.day);
+                        const pastClass = isPastDate(mIdx, d) ? 'is-past' : '';
+                        
+                        html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}} ${{pastClass}}" 
+                                     id="cell-${{mIdx}}-${{d}}"
+                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
+                                     ${{d}}
+                               </td>`;
+                        currentDay++;
+                    }} else {{
+                        html += '<td class="status-empty"></td>';
+                    }}
+                }}
+                html += '</tr>';
+            }});
+            html += '</tbody>';
+            grid.innerHTML = html;
+        }}
+
+        function selectDate(mIdx, day, monthName, statusName, statusClass, element) {{
+            document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
+            if (element) element.classList.add('selected');
+
+            document.getElementById('selectedDateTitle').innerText = `${{monthName}} ${{day}}, ${{YEAR}}`;
+            const badge = document.getElementById('selectedStatusBadge');
+            badge.innerText = statusName;
+            badge.className = `status-badge ${{statusClass}}`;
+
+            const dateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
+            const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
+            
+            const eventsTab = document.getElementById('eventsTab');
+            const eventsList = dayData.events || [];
+            eventsTab.innerHTML = eventsList.length > 0 
+                ? eventsList.map(e => `
+                    <div class="data-card">
+                        <div style="color:#fff; font-weight:600; font-size: 13px;">${{e.title}}</div>
+                        ${{e.time || e.location ? `<div class="card-meta">
+                            ${{e.time ? `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>` : ''}}
+                            ${{e.location ? `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>` : ''}}
+                        </div>` : ''}}
+                    </div>
+                `).join('')
+                : `<p style="color:#64748b;">No events recorded for this date.</p>`;
+
+            const billsTab = document.getElementById('billsTab');
+            const billsList = dayData.bills || [];
+            billsTab.innerHTML = billsList.length > 0 
+                ? billsList.map(b => `
+                    <div class="data-card bill-card">
+                        <div style="color:#fff; font-weight:600; font-size: 13px;">💸 ${{b.title}}</div>
+                    </div>
+                `).join('')
+                : `<p style="color:#64748b;">No bills due on this date.</p>`;
+
+            // Send selected date back to Python session state bridge via query params update
+            try {{
+                const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
+                window.top.history.replaceState(null, '', targetUrl);
+            }} catch(e) {{}}
+        }}
+
+        function switchTab(tabId, btn) {{
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }}
+
+        renderGrid();
+        setTimeout(() => {{
+            const todayCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
+            if (todayCell) selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', todayCell);
+        }}, 50);
+    </script>
+
+    </body>
+    </html>
+    """
+    components.html(calendar_html, height=695, scrolling=False)
+
+    # Capture preview date if clicked in HTML
+    if "preview_date" in query_params:
+        try:
+            st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
+        except:
+            pass
+
+    # Sleek Python Action Button below calendar preview
+    preview_date_str = st.session_state["focus_date"].strftime("%Y-%m-%d") if isinstance(st.session_state["focus_date"], datetime.date) else str(st.session_state["focus_date"])
+    
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    col_act1, col_act2 = st.columns([3, 1])
+    with col_act2:
+        if st.button(f"🚀 Open Focus View for {preview_date_str}", use_container_width=True, type="primary"):
+            st.session_state["active_tab"] = "Focus"
+            st.rerun()
 
 
 # =============================================================================
@@ -473,7 +660,7 @@ if current_tab == "Calendar":
 elif current_tab == "Focus":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
-    sel_formatted = st.session_state["focus_date"].strftime("%A, %B %d, %Y")
+    sel_formatted = st.session_state["focus_date"].strftime("%A, %B %d, %Y") if isinstance(st.session_state["focus_date"], datetime.date) else focus_date_str
 
     st.markdown(f"<div class='section-header' style='margin-top:2px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
     
@@ -508,8 +695,9 @@ elif current_tab == "Focus":
     st.markdown("<div class='section-header' style='margin-top:20px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
     week_cols = st.columns(7)
     
+    f_base_date = st.session_state["focus_date"] if isinstance(st.session_state["focus_date"], datetime.date) else datetime.date.today()
     for i in range(1, 8):
-        future_dt = st.session_state["focus_date"] + datetime.timedelta(days=i)
+        future_dt = f_base_date + datetime.timedelta(days=i)
         f_key = future_dt.strftime("%Y-%m-%d")
         f_data = live_data.get(f_key, {"events": [], "bills": []})
         f_label = future_dt.strftime("%a<br>%b %d")
@@ -527,7 +715,7 @@ elif current_tab == "Focus":
 
     with st.expander("🔍 View Detailed Schedule for Next 7 Days"):
         for i in range(1, 8):
-            future_dt = st.session_state["focus_date"] + datetime.timedelta(days=i)
+            future_dt = f_base_date + datetime.timedelta(days=i)
             f_key = future_dt.strftime("%Y-%m-%d")
             f_data = live_data.get(f_key, {"events": [], "bills": []})
             if f_data["events"] or f_data["bills"]:
@@ -541,7 +729,7 @@ elif current_tab == "Focus":
     
     month_events_summary = []
     for i in range(8, 38):
-        m_dt = st.session_state["focus_date"] + datetime.timedelta(days=i)
+        m_dt = f_base_date + datetime.timedelta(days=i)
         m_key = m_dt.strftime("%Y-%m-%d")
         m_data = live_data.get(m_key)
         if m_data and (m_data["events"] or m_data["bills"]):
