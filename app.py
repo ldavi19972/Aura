@@ -5,9 +5,9 @@ import json
 import datetime
 
 # -----------------------------------------------------------------------------
-# 1. Hardcoded Google Sheet Configuration (CalendarData Tab: gid=1456635855)
+# 1. Google Sheet Configuration (Raw Data Tab: gid=0)
 # -----------------------------------------------------------------------------
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=1456635855"
+RAW_DATA_SHEET_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=0"
 
 # -----------------------------------------------------------------------------
 # 2. Page Configuration & Layout
@@ -49,19 +49,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 3. Google Sheets Data Fetching (CalendarData Tab)
+# 3. Google Sheets Data Fetching (Raw Data Tab)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=30)
-def load_calendar_data_sheet(csv_url):
+def load_raw_calendar_sheet(csv_url):
     data_map = {}
-
-    category_priority = {
-        "Public Holiday": 5,
-        "Holiday": 4,
-        "Work Trip": 3,
-        "Get-away": 2,
-        "Working": 1
-    }
 
     try:
         df = pd.read_csv(csv_url)
@@ -73,54 +65,44 @@ def load_calendar_data_sheet(csv_url):
                 continue
 
             try:
-                date_obj = pd.to_datetime(raw_date)
+                # Dates in Raw Data are formatted as DD/MM/YYYY
+                date_obj = pd.to_datetime(raw_date, dayfirst=True)
                 date_key = date_obj.strftime("%Y-%m-%d")
             except Exception:
                 continue
 
-            title = str(row.get("Title", "")).replace("nan", "").strip()
-            time_val = str(row.get("Time", "")).replace("nan", "").strip()
-            location_val = str(row.get("Location", "")).replace("nan", "").strip()
-            category_val = str(row.get("Category", "Working")).replace("nan", "").strip()
-            amount_val = str(row.get("Amount", "")).replace("nan", "").strip()
-
-            if not category_val:
-                category_val = "Working"
-
             if date_key not in data_map:
                 data_map[date_key] = {
-                    "status": category_val,
+                    "status": "Working",
                     "events": [],
                     "bills": []
                 }
-            else:
-                current_prio = category_priority.get(data_map[date_key]["status"], 0)
-                new_prio = category_priority.get(category_val, 0)
-                if new_prio > current_prio:
-                    data_map[date_key]["status"] = category_val
 
-            # Sort entries into bills vs general events based on category or presence of amount
-            is_bill = category_val.lower() == "bill" or amount_val != ""
-            
-            if title:
-                item_payload = {
-                    "title": title,
-                    "time": time_val,
-                    "location": location_val,
-                    "category": category_val,
-                    "amount": amount_val
-                }
-                if is_bill:
-                    data_map[date_key]["bills"].append(item_payload)
-                else:
-                    data_map[date_key]["events"].append(item_payload)
+            # Extract Bills (Bill 1 .. Bill 5)
+            for col in df.columns:
+                if col.lower().startswith("bill"):
+                    val = str(row.get(col, "")).replace("nan", "").strip()
+                    if val:
+                        data_map[date_key]["bills"].append({"title": val})
+
+            # Extract Events (Event 1 .. Event 5)
+            for col in df.columns:
+                if col.lower().startswith("event"):
+                    val = str(row.get(col, "")).replace("nan", "").strip()
+                    if val:
+                        data_map[date_key]["events"].append({"title": val})
+
+            # Handle optional Category if present in raw sheet
+            category_val = str(row.get("Category", "Working")).replace("nan", "").strip()
+            if category_val:
+                data_map[date_key]["status"] = category_val
 
     except Exception as e:
-        st.error(f"Error fetching data from Google Sheets: {e}")
+        st.error(f"Error fetching data from Raw Data tab: {e}")
 
     return data_map
 
-live_data = load_calendar_data_sheet(DEFAULT_SHEET_URL)
+live_data = load_raw_calendar_sheet(RAW_DATA_SHEET_URL)
 json_data = json.dumps(live_data)
 
 # Current Date Setup
@@ -366,20 +348,6 @@ calendar_html = f"""
     .bill-card {{
         border-left-color: #facc15;
     }}
-
-    .card-meta {{
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-top: 6px;
-        font-size: 11px;
-    }}
-
-    .meta-item {{
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }}
 </style>
 </head>
 <body>
@@ -389,7 +357,7 @@ calendar_html = f"""
         <span class="today-badge">Today</span>
         <span class="today-date-text">{today_formatted}</span>
     </div>
-    <div style="font-size: 12px; color: #64748b;">CalendarData Sync • 2026</div>
+    <div style="font-size: 12px; color: #64748b;">Raw Data Sync • 2026</div>
 </div>
 
 <div class="calendar-container">
@@ -430,7 +398,7 @@ calendar_html = f"""
     
     // Day letter sequence starting on Tuesday
     const dayLetters = ["T", "W", "T", "F", "S", "S", "M"]; 
-    const TOTAL_GRID_COLS = 37; // Trimmed exact size to avoid trailing extra day letters
+    const TOTAL_GRID_COLS = 37;
 
     function getCssClassForCategory(category) {{
         switch(category) {{
@@ -446,7 +414,6 @@ calendar_html = f"""
         const grid = document.getElementById('calendarGrid');
         let html = '<thead><tr><th class="col-header-first">2026</th>';
         
-        // Render headers up to exact 37 grid columns
         for (let col = 0; col < TOTAL_GRID_COLS; col++) {{
             const letter = dayLetters[col % 7];
             html += `<th class="col-header">${{letter}}</th>`;
@@ -514,36 +481,22 @@ calendar_html = f"""
         const eventsTab = document.getElementById('eventsTab');
         const eventsList = dayData.events || [];
         eventsTab.innerHTML = eventsList.length > 0 
-            ? eventsList.map(e => {{
-                let metaHtml = '';
-                if (e.time) metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>`;
-                if (e.location) metaHtml += `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>`;
-                
-                return `
-                    <div class="data-card">
-                        <div style="color:#fff; font-weight:600;">${{e.title}}</div>
-                        ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
-                    </div>
-                `;
-            }}).join('')
+            ? eventsList.map(e => `
+                <div class="data-card">
+                    <div style="color:#fff; font-weight:600;">${{e.title}}</div>
+                </div>
+            `).join('')
             : `<p style="color:#64748b;">No events recorded for this date.</p>`;
 
         // Render Bills
         const billsTab = document.getElementById('billsTab');
         const billsList = dayData.bills || [];
         billsTab.innerHTML = billsList.length > 0 
-            ? billsList.map(b => {{
-                let metaHtml = '';
-                if (b.amount) metaHtml += `<span class="meta-item" style="color:#facc15; font-weight:600;">💵 ${{b.amount}}</span>`;
-                if (b.time) metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{b.time}}</span>`;
-                
-                return `
-                    <div class="data-card bill-card">
-                        <div style="color:#fff; font-weight:600;">${{b.title}}</div>
-                        ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
-                    </div>
-                `;
-            }}).join('')
+            ? billsList.map(b => `
+                <div class="data-card bill-card">
+                    <div style="color:#fff; font-weight:600;">💸 ${{b.title}}</div>
+                </div>
+            `).join('')
             : `<p style="color:#64748b;">No bills due on this date.</p>`;
     }}
 
