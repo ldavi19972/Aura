@@ -5,7 +5,7 @@ import json
 import datetime
 
 # -----------------------------------------------------------------------------
-# 1. Page Configuration & Full-Bleed Edge-to-Edge CSS
+# 1. Page Configuration & Full-Width Centered CSS
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Aura Calendar 2026",
@@ -14,27 +14,23 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Eliminate all default Streamlit padding, margins, headers, and white background borders
 st.markdown("""
 <style>
-    /* Force full viewport background to eliminate white borders */
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"], .stApp {
+    /* Reset margins and force true full width without side scrolling */
+    html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0e1117 !important;
         margin: 0 !important;
         padding: 0 !important;
         width: 100vw !important;
-        height: 100vh !important;
         overflow-x: hidden !important;
     }
-    
-    /* Remove padding around main content block */
+
     .main .block-container {
-        padding: 0rem !important;
-        margin: 0rem !important;
+        padding: 0.5rem 1rem !important;
         max-width: 100% !important;
+        margin: 0 auto !important;
     }
 
-    /* Hide Streamlit default header and footer */
     header, footer, #MainMenu {
         visibility: hidden !important;
         height: 0px !important;
@@ -42,76 +38,82 @@ st.markdown("""
 
     iframe {
         border: none !important;
-        width: 100vw !important;
+        width: 100% !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. Live Google Sheets Data Fetching
+# 2. Top Google Sheet Sync Control
 # -----------------------------------------------------------------------------
-# Replace this URL with your published Google Sheet CSV link
-# (File -> Share -> Publish to Web -> Select 'CSV')
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=csv"
+st.sidebar.title("⚙️ Settings")
+sheet_url = st.sidebar.text_input(
+    "Google Sheet CSV URL",
+    placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv"
+)
 
-@st.cache_data(ttl=60)  # Caches for 60 seconds then auto-refreshes
-def fetch_google_sheets_data():
-    """
-    Fetches schedule, bills, and events from Google Sheets.
-    Returns a dictionary keyed by date ("YYYY-MM-DD").
-    """
-    data_by_date = {}
-    
+@st.cache_data(ttl=30)
+def load_sheet_data(url):
+    """Parses Google Sheet CSV and extracts status colors + tab entries per date."""
+    data_map = {}
+    if not url:
+        return data_map
+
     try:
-        # Load CSV data from Google Sheets
-        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        
-        # Expected columns in your sheet: Date, Event_Title, Event_Time, Bill_Title, Bill_Amount, Notes
+        df = pd.read_csv(url)
         for _, row in df.iterrows():
-            date_key = str(row.get("Date", "")).strip()  # Format: "2026-08-12"
-            if not date_key:
+            raw_date = str(row.get("Date", "")).strip()
+            if not raw_date or raw_date.lower() == "nan":
                 continue
 
-            if date_key not in data_by_date:
-                data_by_date[date_key] = {"events": [], "bills": [], "notes": ""}
+            # Standardize date to YYYY-MM-DD
+            try:
+                date_key = pd.to_datetime(raw_date).strftime("%Y-%m-%d")
+            except Exception:
+                date_key = raw_date
 
-            # Parse Events
-            if pd.notna(row.get("Event_Title")) and row.get("Event_Title"):
-                data_by_date[date_key]["events"].append({
-                    "title": str(row.get("Event_Title")),
-                    "time": str(row.get("Event_Time", "All Day"))
+            if date_key not in data_map:
+                data_map[date_key] = {
+                    "status": str(row.get("Status", "Working")).strip(),
+                    "events": [],
+                    "bills": [],
+                    "notes": str(row.get("Notes", "")).replace("nan", "")
+                }
+
+            # Map Events
+            e_title = str(row.get("Event_Title", "")).replace("nan", "").strip()
+            if e_title:
+                data_map[date_key]["events"].append({
+                    "title": e_title,
+                    "time": str(row.get("Event_Time", "All Day")).replace("nan", "All Day")
                 })
 
-            # Parse Bills
-            if pd.notna(row.get("Bill_Title")) and row.get("Bill_Title"):
-                data_by_date[date_key]["bills"].append({
-                    "title": str(row.get("Bill_Title")),
-                    "amount": str(row.get("Bill_Amount", "$0.00")),
-                    "due": str(row.get("Bill_Due_Status", "Due Today"))
+            # Map Bills
+            b_title = str(row.get("Bill_Title", "")).replace("nan", "").strip()
+            if b_title:
+                data_map[date_key]["bills"].append({
+                    "title": b_title,
+                    "amount": str(row.get("Bill_Amount", "")).replace("nan", "$0.00"),
+                    "due": "Due Today"
                 })
-
-            # Parse Notes
-            if pd.notna(row.get("Notes")) and row.get("Notes"):
-                data_by_date[date_key]["notes"] = str(row.get("Notes"))
 
     except Exception as e:
-        # Fallback empty structure if URL is not yet connected
-        pass
+        st.sidebar.error(f"Error loading Google Sheet: {e}")
 
-    return data_by_date
+    return data_map
 
-# Fetch live sheet data
-live_sheet_data = fetch_google_sheets_data()
-json_live_data = json.dumps(live_sheet_data)
+# Load dynamic data
+live_data = load_sheet_data(sheet_url)
+json_data = json.dumps(live_data)
 
 # Current Date Setup
 today_date = datetime.date.today()
 today_formatted = today_date.strftime("%A, %B %d, %Y")
-today_month_idx = today_date.month - 1  # 0-indexed (0 = Jan, 7 = Aug)
-today_day_num = today_date.day
+today_m_idx = today_date.month - 1
+today_d_num = today_date.day
 
 # -----------------------------------------------------------------------------
-# 3. Full-Screen Interactive Web Component
+# 3. Responsive Responsive Calendar Grid Component
 # -----------------------------------------------------------------------------
 calendar_html = f"""
 <!DOCTYPE html>
@@ -128,16 +130,14 @@ calendar_html = f"""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }}
 
-    html, body {{
+    body {{
         background-color: #0e1117;
         color: #f1f5f9;
         width: 100%;
-        height: 100vh;
-        padding: 16px;
         overflow-x: hidden;
+        padding: 8px 0;
     }}
 
-    /* Top Navigation / Today Bar */
     .top-bar {{
         display: flex;
         justify-content: space-between;
@@ -145,191 +145,182 @@ calendar_html = f"""
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
-        padding: 14px 20px;
-        margin-bottom: 16px;
-    }}
-
-    .today-info {{
-        display: flex;
-        align-items: center;
-        gap: 12px;
+        padding: 12px 18px;
+        margin-bottom: 12px;
     }}
 
     .today-badge {{
         background: rgba(56, 189, 248, 0.15);
         color: #38bdf8;
         border: 1px solid rgba(56, 189, 248, 0.4);
-        padding: 4px 10px;
+        padding: 3px 8px;
         border-radius: 20px;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
-        letter-spacing: 0.5px;
         text-transform: uppercase;
     }}
 
     .today-date-text {{
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
         color: #f8fafc;
+        margin-left: 8px;
     }}
 
-    .year-title {{
-        font-size: 14px;
-        color: #64748b;
-        font-weight: 600;
-    }}
-
-    /* Grid Layout Container */
+    /* Grid Layout Container - Centered and Non-scrolling */
     .calendar-container {{
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
-        padding: 16px;
-        overflow-x: auto;
+        padding: 12px;
+        width: 100%;
+        margin: 0 auto;
     }}
 
     table.cal-grid {{
         width: 100%;
+        table-layout: fixed; /* Ensures strict proportional scaling across width */
         border-collapse: separate;
         border-spacing: 2px;
     }}
 
     th.col-header {{
         color: #64748b;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         text-align: center;
-        padding: 4px 0;
-        min-width: 28px;
+        padding: 3px 0;
+        width: 2.9%;
+    }}
+
+    th.col-header-first {{
+        width: 9%;
+        text-align: left;
+        padding-left: 6px;
     }}
 
     td.month-label {{
         color: #94a3b8;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
-        padding: 4px 8px;
+        padding: 3px 6px;
         white-space: nowrap;
         text-align: left;
-        min-width: 90px;
+        width: 9%;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
 
     /* Calendar Day Cells */
     .day-cell {{
-        height: 30px;
-        min-width: 28px;
-        border-radius: 5px;
+        height: 28px;
+        width: 2.9%;
+        border-radius: 4px;
         text-align: center;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         cursor: pointer;
-        transition: all 0.12s ease;
+        transition: all 0.1s ease;
         user-select: none;
-        display: table-cell;
         vertical-align: middle;
         border: 1px solid transparent;
-        position: relative;
     }}
 
     .day-cell:hover {{
-        transform: scale(1.08);
-        border-color: #ffffff55 !important;
-        z-index: 5;
+        transform: scale(1.1);
+        border-color: #ffffff77 !important;
+        z-index: 10;
     }}
 
-    /* Today Highlight Ring */
     .day-cell.is-today {{
-        box-shadow: 0 0 0 2px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.6) !important;
+        box-shadow: 0 0 0 2px #38bdf8, 0 0 8px rgba(56, 189, 248, 0.6) !important;
         border-color: #38bdf8 !important;
-        z-index: 4;
     }}
 
-    /* Status Color Themes */
-    .status-empty {{ background-color: #1a1e27; color: #475569; }}
-    .status-work {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
-    .status-pub-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
-    .status-holiday {{ background-color: #4c0519; color: #fb7185; border-color: #9f1239; }}
-    .status-getaway {{ background-color: #422006; color: #facc15; border-color: #713f12; }}
-    .status-work-trip {{ background-color: #3b0764; color: #c084fc; border-color: #6b21a8; }}
-
-    /* Active Selected State */
     .day-cell.selected {{
         outline: 2px solid #ffffff;
         outline-offset: 1px;
     }}
 
+    /* Dynamic Status Color Themes */
+    .status-empty {{ background-color: #1a1e27; color: #475569; }}
+    .status-working {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
+    .status-public-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
+    .status-holiday {{ background-color: #4c0519; color: #fb7185; border-color: #9f1239; }}
+    .status-get-away {{ background-color: #422006; color: #facc15; border-color: #713f12; }}
+    .status-work-trip {{ background-color: #3b0764; color: #c084fc; border-color: #6b21a8; }}
+
     /* Legend Bar */
     .legend-bar {{
         display: flex;
-        gap: 12px;
-        margin-top: 14px;
+        gap: 10px;
+        margin-top: 10px;
         flex-wrap: wrap;
     }}
 
     .legend-item {{
         display: flex;
         align-items: center;
-        gap: 6px;
-        font-size: 11px;
+        gap: 5px;
+        font-size: 10px;
         color: #94a3b8;
         background: #1a1e27;
-        padding: 4px 10px;
-        border-radius: 5px;
+        padding: 3px 8px;
+        border-radius: 4px;
         border: 1px solid #28303f;
     }}
 
     .legend-dot {{
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         border-radius: 2px;
     }}
 
-    /* Detail Panel & Tabbed Interface */
+    /* Detail Panel */
     .detail-panel {{
-        margin-top: 16px;
+        margin-top: 12px;
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
-        padding: 20px;
+        padding: 16px;
     }}
 
     .panel-header {{
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
     }}
 
     .panel-title {{
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 700;
         color: #f8fafc;
     }}
 
     .status-badge {{
-        font-size: 11px;
-        padding: 3px 10px;
-        border-radius: 12px;
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 10px;
         font-weight: 600;
     }}
 
-    /* Tabs Styling */
     .tab-bar {{
         display: flex;
-        gap: 6px;
+        gap: 4px;
         border-bottom: 1px solid #222734;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
     }}
 
     .tab-btn {{
         background: none;
         border: none;
         color: #64748b;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
-        padding: 8px 14px;
+        padding: 6px 12px;
         cursor: pointer;
         border-bottom: 2px solid transparent;
-        transition: all 0.15s;
     }}
 
     .tab-btn.active {{
@@ -340,52 +331,36 @@ calendar_html = f"""
     .tab-content {{
         display: none;
         color: #94a3b8;
-        font-size: 13px;
-        line-height: 1.5;
+        font-size: 12px;
     }}
 
     .tab-content.active {{
         display: block;
     }}
 
-    /* Dynamic Data Cards */
     .data-card {{
         background: #1c212c;
         border-left: 3px solid #38bdf8;
-        padding: 10px 14px;
-        border-radius: 5px;
-        margin-bottom: 8px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin-bottom: 6px;
     }}
 
     .data-card.bill {{
         border-left-color: #f59e0b;
     }}
-
-    .data-title {{
-        color: #f8fafc;
-        font-weight: 600;
-        font-size: 13px;
-    }}
-
-    .data-sub {{
-        color: #64748b;
-        font-size: 11px;
-        margin-top: 2px;
-    }}
 </style>
 </head>
 <body>
 
-<!-- Top Bar showing Today's Date -->
 <div class="top-bar">
-    <div class="today-info">
+    <div>
         <span class="today-badge">Today</span>
         <span class="today-date-text">{today_formatted}</span>
     </div>
-    <div class="year-title">Live Google Sheets Sync • 2026</div>
+    <div style="font-size: 12px; color: #64748b;">Aura Live Schedule • 2026</div>
 </div>
 
-<!-- Linear Calendar Grid -->
 <div class="calendar-container">
     <table class="cal-grid" id="calendarGrid"></table>
 
@@ -395,15 +370,14 @@ calendar_html = f"""
         <div class="legend-item"><div class="legend-dot" style="background:#fb7185"></div>Holiday</div>
         <div class="legend-item"><div class="legend-dot" style="background:#facc15"></div>Get-away</div>
         <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#38bdf8; border:1px solid #fff"></div>Today's Date</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
     </div>
 </div>
 
-<!-- Interactive Detail Panel -->
-<div class="detail-panel" id="detailPanel">
+<div class="detail-panel">
     <div class="panel-header">
         <div class="panel-title" id="selectedDateTitle">Select a date</div>
-        <div class="status-badge status-work" id="selectedStatusBadge">Working</div>
+        <div class="status-badge status-working" id="selectedStatusBadge">Working</div>
     </div>
 
     <div class="tab-bar">
@@ -419,28 +393,26 @@ calendar_html = f"""
 
 <script>
     const YEAR = 2026;
-    const TODAY = {{ month: {today_month_idx}, day: {today_day_num} }};
-    const liveGoogleSheetData = {json_live_data};
+    const TODAY = {{ month: {today_m_idx}, day: {today_d_num} }};
+    const sheetData = {json_data};
 
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    function getStatus(monthIdx, day) {{
-        if (monthIdx === 7 && day >= 23 && day <= 29) return {{ class: 'status-holiday', name: 'Holiday' }};
-        if (monthIdx === 10 && day >= 16 && day <= 20) return {{ class: 'status-work-trip', name: 'Work Trip' }};
-        if (monthIdx === 10 && (day === 1 || day >= 30)) return {{ class: 'status-getaway', name: 'Get-away' }};
-        if (monthIdx === 0 && day === 1) return {{ class: 'status-pub-holiday', name: 'Public Holiday' }};
-        
-        const dateObj = new Date(YEAR, monthIdx, day);
-        const dayOfWeek = dateObj.getDay();
-        if (dayOfWeek === 0 || dayOfWeek === 6) return {{ class: 'status-empty', name: 'Weekend' }};
-        
-        return {{ class: 'status-work', name: 'Working' }};
+    function getStatusClass(statusName) {{
+        if (!statusName) return 'status-empty';
+        const s = statusName.toLowerCase().replace(/[^a-z]/g, '');
+        if (s.includes('publicholiday')) return 'status-public-holiday';
+        if (s.includes('holiday')) return 'status-holiday';
+        if (s.includes('getaway')) return 'status-get-away';
+        if (s.includes('worktrip')) return 'status-work-trip';
+        if (s.includes('working') || s.includes('work')) return 'status-working';
+        return 'status-empty';
     }}
 
     function renderGrid() {{
         const grid = document.getElementById('calendarGrid');
-        let html = '<thead><tr><th class="col-header">2026</th>';
+        let html = '<thead><tr><th class="col-header-first">2026</th>';
         
         for (let d = 1; d <= 31; d++) {{
             html += `<th class="col-header">${{d}}</th>`;
@@ -455,17 +427,24 @@ calendar_html = f"""
                 if (d <= totalDays) {{
                     const dateObj = new Date(YEAR, mIdx, d);
                     const dayLetter = dateObj.toLocaleDateString('en-US', {{ weekday: 'narrow' }});
-                    const status = getStatus(mIdx, d);
+                    
+                    const mStr = String(mIdx + 1).padStart(2, '0');
+                    const dStr = String(d).padStart(2, '0');
+                    const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
+                    
+                    const entry = sheetData[dateKey];
+                    const statusName = entry ? entry.status : ((dateObj.getDay() === 0 || dateObj.getDay() === 6) ? 'Weekend' : 'Working');
+                    const statusClass = getStatusClass(statusName);
                     
                     const isToday = (mIdx === TODAY.month && d === TODAY.day);
                     const todayClass = isToday ? 'is-today' : '';
                     
-                    html += `<td class="day-cell ${{status.class}} ${{todayClass}}" 
+                    html += `<td class="day-cell ${{statusClass}} ${{todayClass}}" 
                                  id="cell-${{mIdx}}-${{d}}"
-                                 onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{status.name}}', '${{status.class}}', this)">
+                                 onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{statusName}}', '${{statusClass}}', this)">
                                  ${{dayLetter}}
                              </td>`;
-                }} else {{
+                } else {{
                     html += '<td style="background:transparent;"></td>';
                 }}
             }}
@@ -486,43 +465,25 @@ calendar_html = f"""
         badge.innerText = statusName;
         badge.className = `status-badge ${{statusClass}}`;
 
-        // Format Date Key (YYYY-MM-DD)
         const mStr = String(mIdx + 1).padStart(2, '0');
         const dStr = String(day).padStart(2, '0');
         const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
 
-        // Sync Live Data Content from Google Sheets into Tabs
-        const dayData = liveGoogleSheetData[dateKey] || {{ events: [], bills: [], notes: '' }};
+        const dayData = sheetData[dateKey] || {{ events: [], bills: [], notes: '' }};
         
-        // Render Events
-        const eventsContainer = document.getElementById('eventsTab');
-        if (dayData.events && dayData.events.length > 0) {{
-            eventsContainer.innerHTML = dayData.events.map(e => `
-                <div class="data-card">
-                    <div class="data-title">${{e.title}}</div>
-                    <div class="data-sub">🕒 ${{e.time}}</div>
-                </div>
-            `).join('');
-        }} else {{
-            eventsContainer.innerHTML = `<p style="color:#64748b; font-size:12px;">No scheduled events in Google Sheets for this date.</p>`;
-        }}
+        // Render Tab Data
+        const eventsTab = document.getElementById('eventsTab');
+        eventsTab.innerHTML = dayData.events.length > 0 
+            ? dayData.events.map(e => `<div class="data-card"><div style="color:#fff;font-weight:600;">${{e.title}}</div><div style="color:#64748b;font-size:11px;">🕒 ${{e.time}}</div></div>`).join('')
+            : `<p style="color:#64748b;">No events recorded in Google Sheet.</p>`;
 
-        // Render Bills
-        const billsContainer = document.getElementById('billsTab');
-        if (dayData.bills && dayData.bills.length > 0) {{
-            billsContainer.innerHTML = dayData.bills.map(b => `
-                <div class="data-card bill">
-                    <div class="data-title">${{b.title}} — <span style="color:#f59e0b;">${{b.amount}}</span></div>
-                    <div class="data-sub">💳 ${{b.due}}</div>
-                </div>
-            `).join('');
-        }} else {{
-            billsContainer.innerHTML = `<p style="color:#64748b; font-size:12px;">No bills due in Google Sheets for this date.</p>`;
-        }}
+        const billsTab = document.getElementById('billsTab');
+        billsTab.innerHTML = dayData.bills.length > 0 
+            ? dayData.bills.map(b => `<div class="data-card bill"><div style="color:#fff;font-weight:600;">${{b.title}} — <span style="color:#f59e0b;">${{b.amount}}</span></div></div>`).join('')
+            : `<p style="color:#64748b;">No bills recorded in Google Sheet.</p>`;
 
-        // Render Notes
-        const notesContainer = document.getElementById('notesTab');
-        notesContainer.innerHTML = `<p style="color:#94a3b8; font-size:13px;">${{dayData.notes || 'No notes found in Google Sheets for this date.'}}</p>`;
+        const notesTab = document.getElementById('notesTab');
+        notesTab.innerHTML = `<p style="color:#94a3b8;">${{dayData.notes || 'No notes for this date.'}}</p>`;
     }}
 
     function switchTab(tabId, btn) {{
@@ -533,12 +494,11 @@ calendar_html = f"""
         document.getElementById(tabId).classList.add('active');
     }}
 
-    // Initialize Grid & Auto-select Today
     renderGrid();
     setTimeout(() => {{
         const todayCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
         if (todayCell) {{
-            selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-work', todayCell);
+            selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', todayCell);
         }}
     }}, 50);
 </script>
@@ -547,5 +507,4 @@ calendar_html = f"""
 </html>
 """
 
-# Render full screen height component
-components.html(calendar_html, height=1000, scrolling=False)
+components.html(calendar_html, height=680, scrolling=False)
