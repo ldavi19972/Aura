@@ -279,8 +279,11 @@ def fetch_finances_data(finances_url):
                 fin_data["var_budgets"].append({"item": name, "weekly": f"${wk_val:,.2f}"})
         except: pass
 
-    # Dynamically extract goals from rows 16 to 20 matching columns K (name), L (target), N (end date), P (weekly contrib), Q (status)
-    # Account transfers row mappings (Index B = 1) for the current balances
+    # Goals mapping: rows 15 to 19 (Holidays, Italy, Adelaide, Emergency Fund, Savings)
+    # Column L (index 11) = Goal Name
+    # Column M (index 12) = Target Amount
+    # Column O (index 14) = End Date
+    # Column P (index 15) = Weekly Contribution / Status text
     transfer_balance_mapping = {
         "Holidays": 26,
         "Italy": 27,
@@ -289,33 +292,45 @@ def fetch_finances_data(finances_url):
         "Savings": 30
     }
 
-    for r in range(16, 21):
+    for r in range(15, 20):
         try:
-            g_name = str(df.iloc[r, 11]).strip() # Column K
+            g_name = str(df.iloc[r, 11]).strip() # Column L (Goal Name)
             if not g_name or g_name.lower() == 'nan': continue
             
-            target_val = clean_num(df.iloc[r, 12]) # Column L
-            end_date = str(df.iloc[r, 14]).strip() if pd.notna(df.iloc[r, 14]) else "" # Column N
+            target_val = clean_num(df.iloc[r, 12]) # Column M
+            end_date = str(df.iloc[r, 14]).strip() if pd.notna(df.iloc[r, 14]) else "" # Column O
             if end_date.lower() == 'nan': end_date = ""
             
-            rate_val = clean_num(df.iloc[r, 15]) # Column P
-            status_text = str(df.iloc[r, 16]).strip() if pd.notna(df.iloc[r, 16]) else "" # Column Q
+            p_val_raw = str(df.iloc[r, 15]).strip() if pd.notna(df.iloc[r, 15]) else "" # Column P
+            
+            # Determine contribution rate and status based on Column P
+            rate_val = 0.0
+            status_text = "IN PROGRESS"
+            
+            if p_val_raw.upper() in ["WAITING", "SAVED", "IN PROGRESS"]:
+                status_text = p_val_raw.upper()
+            else:
+                rate_val = clean_num(p_val_raw)
+                # If there's a weekly rate and an end date, check if it's waiting or in progress
+                # Usually if Column P has a number, it's active contribution
+                if rate_val > 0:
+                    status_text = "IN PROGRESS"
 
-            # Fetch current balance dynamically from corresponding Account Transfers row
+            # Fetch current balance dynamically from corresponding Account Transfers row (Column B = Index 1)
             bal_val = 0.0
             t_row = transfer_balance_mapping.get(g_name)
             if t_row is not None and t_row < len(df):
-                bal_val = clean_num(df.iloc[t_row, 1]) # Column B
+                bal_val = clean_num(df.iloc[t_row, 1])
 
             pct = int((bal_val / target_val * 100)) if target_val > 0 else 0
             if pct > 100: pct = 100
 
-            if status_text.upper() == "SAVED" or pct >= 100:
+            if status_text == "SAVED" or pct >= 100:
                 badge = "SAVED"
                 badge_class = "badge-saved"
                 color = "#4ade80"
                 details = "Target Achieved • $0/wk needed"
-            elif status_text.upper() == "WAITING":
+            elif status_text == "WAITING":
                 badge = "WAITING"
                 badge_class = "badge-waiting"
                 color = "#facc15"
