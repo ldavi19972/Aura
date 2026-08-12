@@ -23,7 +23,6 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Global Reset */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0e1117 !important;
         color: #f1f5f9 !important;
@@ -42,7 +41,6 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Streamlit Native Tab Bar Container */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px !important;
         background-color: #11151c !important;
@@ -52,15 +50,8 @@ st.markdown("""
         margin-bottom: 16px !important;
     }
 
-    .stTabs [data-baseweb="tab-border"] {
-        display: none !important;
-    }
-
-    .stTabs [data-baseweb="tab-highlight"] {
-        display: none !important;
-        height: 0px !important;
-        background-color: transparent !important;
-    }
+    .stTabs [data-baseweb="tab-border"] { display: none !important; }
+    .stTabs [data-baseweb="tab-highlight"] { display: none !important; height: 0px !important; background-color: transparent !important; }
 
     .stTabs [data-baseweb="tab"] {
         height: 44px !important;
@@ -71,10 +62,7 @@ st.markdown("""
         transition: all 0.2s ease-in-out !important;
     }
 
-    .stTabs [data-baseweb="tab"] *,
-    .stTabs [data-baseweb="tab"] p,
-    .stTabs [data-baseweb="tab"] span,
-    .stTabs [data-baseweb="tab"] button {
+    .stTabs [data-baseweb="tab"] *, .stTabs [data-baseweb="tab"] p, .stTabs [data-baseweb="tab"] span {
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
         opacity: 1 !important;
@@ -82,24 +70,11 @@ st.markdown("""
         font-size: 14px !important;
     }
 
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: #1c212c !important;
-        border-color: #3b4252 !important;
-    }
-
     .stTabs [aria-selected="true"] {
         background-color: #222734 !important;
         border: 1px solid #3b4252 !important;
         border-bottom: 3px solid #22c55e !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-    }
-
-    .stTabs [aria-selected="true"] *,
-    .stTabs [aria-selected="true"] p,
-    .stTabs [aria-selected="true"] span {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        font-weight: 700 !important;
     }
 
     .section-header {
@@ -126,11 +101,7 @@ st.markdown("""
         margin-bottom: 2px;
     }
 
-    .metric-value {
-        font-size: 20px;
-        font-weight: 700;
-    }
-
+    .metric-value { font-size: 20px; font-weight: 700; }
     .metric-positive { color: #4ade80; }
     .metric-negative { color: #fb7185; }
     .metric-neutral  { color: #38bdf8; }
@@ -143,50 +114,17 @@ st.markdown("""
         margin-bottom: 6px;
     }
 
-    .goal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 4px;
-    }
-
-    .goal-title {
-        font-size: 14px;
-        font-weight: 700;
-        color: #f8fafc;
-    }
-
-    .goal-badge {
-        font-size: 10px;
-        font-weight: 700;
-        padding: 2px 8px;
-        border-radius: 12px;
-        text-transform: uppercase;
-    }
+    .goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .goal-title { font-size: 14px; font-weight: 700; color: #f8fafc; }
+    .goal-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; }
 
     .badge-saved { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid #16522c; }
     .badge-progress { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #1d4ed8; }
     .badge-waiting { background: rgba(250, 204, 21, 0.15); color: #facc15; border: 1px solid #713f12; }
 
-    .progress-bar-bg {
-        background: #222734;
-        height: 7px;
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 6px 0;
-    }
-
-    .progress-bar-fill {
-        height: 100%;
-        border-radius: 4px;
-    }
-
-    .goal-footer {
-        display: flex;
-        justify-content: space-between;
-        font-size: 11px;
-        color: #94a3b8;
-    }
+    .progress-bar-bg { background: #222734; height: 7px; border-radius: 4px; overflow: hidden; margin: 6px 0; }
+    .progress-bar-fill { height: 100%; border-radius: 4px; }
+    .goal-footer { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; }
 
     .cashflow-card {
         background: #161a22;
@@ -204,26 +142,13 @@ st.markdown("""
         border-bottom: 1px solid #1c212c;
         font-size: 12px;
     }
-
-    .cf-row:last-child {
-        border-bottom: none;
-    }
+    .cf-row:last-child { border-bottom: none; }
 
     .stExpander {
         background: #161a22 !important;
         border: 1px solid #222734 !important;
         border-radius: 10px !important;
         margin-bottom: 6px !important;
-        padding: 0px !important;
-        overflow: hidden !important;
-    }
-
-    .stExpander details {
-        background-color: #161a22 !important;
-        border: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border-radius: 10px !important;
     }
 
     .stExpander summary {
@@ -233,21 +158,7 @@ st.markdown("""
         font-weight: 600 !important;
         padding: 10px 14px !important;
         border-radius: 10px !important;
-        transition: background-color 0.15s ease, color 0.15s ease;
     }
-
-    .stExpander summary:hover,
-    .stExpander summary:focus,
-    .stExpander summary:active,
-    .stExpander details[open] > summary {
-        background-color: #1c212c !important;
-        color: #ffffff !important;
-        outline: none !important;
-        box-shadow: none !important;
-    }
-
-    .stExpander summary p { color: inherit !important; }
-    .stExpander summary svg { fill: #94a3b8 !important; color: #94a3b8 !important; }
 
     .stExpander [data-testid="stExpanderDetails"] {
         background-color: #161a22 !important;
@@ -255,10 +166,7 @@ st.markdown("""
         border-top: 1px solid #222734 !important;
     }
     
-    iframe {
-        border: none !important;
-        width: 100% !important;
-    }
+    iframe { border: none !important; width: 100% !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -450,14 +358,8 @@ def fetch_finances_data(finances_url):
             details = f"Target: {end_date} • Contrib: ${rate_val:,.2f}/wk" if end_date else f"Contrib: ${rate_val:,.2f}/wk"
 
         fin_data["goals"].append({
-            "name": g_name,
-            "current": bal_val,
-            "target": target_val,
-            "pct": pct,
-            "badge": badge,
-            "badge_class": badge_class,
-            "color": color,
-            "details": details
+            "name": g_name, "current": bal_val, "target": target_val, "pct": pct,
+            "badge": badge, "badge_class": badge_class, "color": color, "details": details
         })
 
     for r in [22, 23]:
@@ -468,9 +370,7 @@ def fetch_finances_data(finances_url):
                 repay = clean_num(df.iloc[r, 4])
                 occur = str(df.iloc[r, 5]).strip()
                 close = str(df.iloc[r, 6]).strip()
-                fin_data["debts"].append({
-                    "name": d_name, "owing": owing, "repay": repay, "occur": occur, "close": close
-                })
+                fin_data["debts"].append({"name": d_name, "owing": owing, "repay": repay, "occur": occur, "close": close})
         except: pass
 
     for r in range(3, 9):
@@ -479,21 +379,19 @@ def fetch_finances_data(finances_url):
             if a_name and a_name.lower() != 'nan':
                 cost = clean_num(df.iloc[r, 12])
                 val = clean_num(df.iloc[r, 14])
-                fin_data["assets"].append({
-                    "item": a_name, "price": f"${cost:,.2f}", "val": f"${val:,.2f}"
-                })
+                fin_data["assets"].append({"item": a_name, "price": f"${cost:,.2f}", "val": f"${val:,.2f}"})
         except: pass
 
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. Streamlit Layout & Tabs (Including New Focus Tab)
+# 4. Streamlit Layout & Tabs
 # -----------------------------------------------------------------------------
 focus_date_str = st.query_params.get("focus_date", "")
 
 tab_cal, tab_focus, tab_fin = st.tabs([
     "📅  Calendar & Schedule", 
-    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View (Select Date)", 
+    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View (Double-click date)", 
     "💰  Finances & Net Worth"
 ])
 
@@ -552,7 +450,7 @@ with tab_cal:
         .panel-title {{ font-size: 14px; font-weight: 700; color: #f8fafc; }}
         .status-badge {{ font-size: 10px; padding: 2px 6px; border-radius: 8px; font-weight: 600; }}
         .tab-bar {{ display: flex; gap: 8px; border-bottom: 1px solid #222734; margin-bottom: 8px; }}
-        .tab-btn {{ background: none; border: none; color: #64748b; font-size: 11px; font-weight: 600; padding: 3px 8px; cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s ease; }}
+        .tab-btn {{ background: none; border: none; color: #64748b; font-size: 11px; font-weight: 600; padding: 3px 8px; cursor: pointer; border-bottom: 2px solid transparent; }}
         .tab-btn.active {{ color: #38bdf8; border-bottom-color: #38bdf8; }}
         .tab-content {{ display: none; color: #94a3b8; font-size: 12px; }}
         .tab-content.active {{ display: block; }}
@@ -581,7 +479,7 @@ with tab_cal:
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date to load details & enable Focus Tab button</div>
+            <div class="click-hint">💡 Single-click to preview bottom • Double-click to jump straight to Focus Tab</div>
         </div>
     </div>
 
@@ -589,10 +487,6 @@ with tab_cal:
         <div class="panel-header">
             <div class="panel-title" id="selectedDateTitle">Select a date</div>
             <div class="status-badge status-working" id="selectedStatusBadge">Working</div>
-        </div>
-
-        <div style="margin-bottom: 8px;">
-            <a id="focusLinkBtn" href="#" target="_top" style="display: none; background: #1c212c; color: #38bdf8; border: 1px solid #3b4252; padding: 5px 12px; border-radius: 6px; font-size: 11px; text-decoration: none; font-weight: 700;">🔍 Open Focus Tab for this date</a>
         </div>
 
         <div class="tab-bar">
@@ -656,7 +550,8 @@ with tab_cal:
                         
                         html += `<td class="day-cell ${{statusClass}} ${{isToday ? 'is-today' : ''}} ${{pastClass}}" 
                                      id="cell-${{mIdx}}-${{d}}"
-                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)">
+                                     onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{categoryName}}', '${{statusClass}}', this)"
+                                     ondblclick="doubleClickDate('${{dateKey}}')">
                                      ${{d}}
                                </td>`;
                         currentDay++;
@@ -680,12 +575,6 @@ with tab_cal:
             badge.className = `status-badge ${{statusClass}}`;
 
             const dateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
-            
-            const btn = document.getElementById('focusLinkBtn');
-            btn.href = '?focus_date=' + dateKey;
-            btn.style.display = 'inline-block';
-            btn.innerText = `🔍 Open Focus Tab for ${{monthName}} ${{day}}, ${{YEAR}}`;
-
             const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
             
             const eventsTab = document.getElementById('eventsTab');
@@ -713,6 +602,14 @@ with tab_cal:
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
         }}
 
+        function doubleClickDate(dateKey) {{
+            try {{
+                window.parent.location.href = window.parent.location.pathname + '?focus_date=' + dateKey;
+            }} catch (e) {{
+                window.location.href = '?focus_date=' + dateKey;
+            }}
+        }}
+
         function switchTab(tabId, btn) {{
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -734,7 +631,7 @@ with tab_cal:
 
 
 # =============================================================================
-# TAB 2: FOCUS VIEW (Dynamic Next-Week & Next-Month Breakdown)
+# TAB 2: FOCUS VIEW
 # =============================================================================
 with tab_focus:
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
@@ -743,7 +640,7 @@ with tab_focus:
         st.markdown("""
         <div class="cashflow-card" style="text-align: center; padding: 40px;">
             <div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No Date Selected</div>
-            <div style="font-size: 13px; color: #94a3b8;">Go to the <b>Calendar & Schedule</b> tab, click any date on the grid, and click the <b>"Open Focus Tab"</b> button that appears to load its detailed focus view here.</div>
+            <div style="font-size: 13px; color: #94a3b8;">Go to the <b>Calendar & Schedule</b> tab and <b>double-click</b> any date cell on the grid to jump straight here with full details loaded.</div>
         </div>
         """, unsafe_allow_html=True)
     else:
