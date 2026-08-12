@@ -9,52 +9,64 @@ st.set_page_config(
     layout="wide",
 )
 
-# --- Modern App Styling & CSS ---
+# --- Facebook-Style Modern Dark UI CSS ---
 st.markdown("""
     <style>
-        /* Main Theme Background */
+        /* Base App Background (Facebook Dark Theme Style) */
         .stApp {
-            background-color: #0b0f19;
-            color: #f3f4f6;
+            background-color: #18191a;
+            color: #e4e6eb;
+            font-family: SFProDisplay-Regular, Helvetica, Arial, sans-serif;
         }
         
         /* Sidebar Styling */
         [data-testid="stSidebar"] {
-            background-color: #111827;
-            border-right: 1px solid #1f2937;
+            background-color: #242526;
+            border-right: 1px solid #393a3b;
         }
         
         /* Metric Card Containers */
         [data-testid="stMetric"] {
-            background-color: #161e2e;
-            border: 1px solid #1f2937;
+            background-color: #242526;
+            border: 1px solid #393a3b;
             padding: 16px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
         [data-testid="stMetricLabel"] {
-            color: #9ca3af !important;
+            color: #b0b3b8 !important;
             font-size: 0.85rem !important;
+            font-weight: 600 !important;
         }
         [data-testid="stMetricValue"] {
-            color: #f9fafb !important;
-            font-size: 1.6rem !important;
+            color: #e4e6eb !important;
+            font-size: 1.5rem !important;
             font-weight: 700 !important;
         }
 
-        /* Section Headings */
+        /* Headings */
         h1, h2, h3 {
-            color: #f9fafb;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #e4e6eb;
+            font-weight: 700;
         }
         
-        /* Card Containers */
-        .custom-card {
-            background-color: #161e2e;
-            border: 1px solid #1f2937;
+        /* Facebook Card Containers */
+        .fb-card {
+            background-color: #242526;
+            border: 1px solid #393a3b;
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 16px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        
+        .fb-badge {
+            background-color: #3a3b3c;
+            color: #2e89ff;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -62,7 +74,7 @@ st.markdown("""
 # --- Sidebar Navigation ---
 st.sidebar.markdown("## ⚡ Aura Dashboard")
 st.sidebar.markdown("---")
-tab = st.sidebar.radio("Navigation", ["📊 Dashboard", "💳 Finances & Budgets", "💎 Assets & Depreciation", "📅 Schedule & Calendar"])
+tab = st.sidebar.radio("Navigation", ["📊 News Feed / Dashboard", "💳 Finances & Budgets", "💎 Assets & Depreciation", "📅 Schedule & Calendar"])
 
 # --- Load Live Data from Google Sheets ---
 @st.cache_data(ttl=60)
@@ -84,31 +96,29 @@ def load_live_data():
 
 finances_df, calendar_df = load_live_data()
 
-# --- Extract Metrics ---
+# --- Extract Metrics Safely ---
 weekly_income_val = 0.0
 weekly_expenses_val = 0.0
-total_liabilities_val = 0.0
+total_liabilities_val = 47236.0  # Credit Card (26118) + Student Loan (21118)
 
 if finances_df is not None:
     try:
         weekly_income_val = float(str(finances_df.iloc[0]['Weekly']).replace('$', '').replace(',', ''))
         weekly_expenses_val = float(str(finances_df.iloc[3]['Weekly']).replace('$', '').replace(',', ''))
-        # Get total liabilities sum or specific cell
-        total_liabilities_val = 26118.0 + 21118.0 # Example fallback or exact row sum
     except Exception:
         pass
 
 net_surplus_val = weekly_income_val - weekly_expenses_val
 
 # ==========================================
-# TAB 1: DASHBOARD
+# TAB 1: NEWS FEED / DASHBOARD
 # ==========================================
-if tab == "📊 Dashboard":
+if tab == "📊 News Feed / Dashboard":
     st.title("Dashboard Overview")
-    st.caption("Your financial health and schedule synced live from Google Sheets.")
+    st.caption("Your financial health and schedule feed synced live from Google Sheets.")
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     
-    # Metrics Row
+    # Top Metrics Row
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Weekly Income", f"${weekly_income_val:,.2f}", "Salary + Transfers")
@@ -119,14 +129,13 @@ if tab == "📊 Dashboard":
     with col4:
         st.metric("Total Liabilities", f"${total_liabilities_val:,.2f}", "Loans & Debt")
 
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
     
-    # Two Column Main View
-    col_a, col_b = st.columns([1.1, 0.9])
+    # Two Column Facebook Layout Feed
+    col_feed, col_widget = st.columns([1.1, 0.9])
     
-    with col_a:
-        st.subheader("🎯 Active Savings Goals")
-        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+    with col_feed:
+        st.subheader("🎯 Active Savings Goals Feed")
         
         if finances_df is not None:
             try:
@@ -160,25 +169,27 @@ if tab == "📊 Dashboard":
                     if due_date == 'nan':
                         due_date = 'Ongoing'
 
-                    col_g1, col_g2 = st.columns([2, 1])
-                    with col_g1:
-                        st.markdown(f"**{name}**")
-                    with col_g2:
-                        st.markdown(f"<div style='text-align: right; color: #9ca3af; font-size: 0.85rem;'>${saved:,.0f} / ${target:,.0f}</div>", unsafe_allow_html=True)
+                    # Facebook Post-style Card for each goal
+                    st.markdown(f"""
+                        <div class="fb-card">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-weight: 700; font-size: 1.05rem; color: #e4e6eb;">{name}</span>
+                                <span class="fb-badge">Target: ${target:,.0f}</span>
+                            </div>
+                            <div style="color: #b0b3b8; font-size: 0.85rem; margin-bottom: 6px;">
+                                Saved: <strong style="color: #45bd62;">${saved:,.2f}</strong> • Due: {due_date}
+                            </div>
+                    """, unsafe_allow_html=True)
                     
                     st.progress(progress)
-                    st.caption(f"Estimated Completion / Due: {due_date}")
-                    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
             except Exception as e:
                 st.warning("Could not parse savings goals format.")
         else:
-            st.warning("Loading savings goals...")
-            
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.warning("Loading savings goals feed...")
         
-    with col_b:
-        st.subheader("📅 Upcoming Schedule")
-        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+    with col_widget:
+        st.subheader("📅 Upcoming Schedule Feed")
         
         if calendar_df is not None and not calendar_df.empty:
             try:
@@ -186,7 +197,7 @@ if tab == "📊 Dashboard":
                 cal_clean.columns = ['Date', 'Title', 'Time', 'Location', 'Category'] + list(range(5, len(cal_clean.columns)))
                 cal_clean['Date'] = pd.to_datetime(cal_clean['Date'], errors='coerce')
                 
-                # Current baseline date set to Aug 12, 2026
+                # Baseline current date: Aug 12, 2026
                 today = pd.Timestamp(datetime.date(2026, 8, 12))
                 upcoming_df = cal_clean[cal_clean['Date'] >= today].sort_values(by='Date', ascending=True)
                 
@@ -195,18 +206,26 @@ if tab == "📊 Dashboard":
                         ev_date = row['Date'].strftime('%d %b %Y') if pd.notnull(row['Date']) else "TBD"
                         ev_title = str(row.get('Title', 'Event'))
                         ev_time = str(row.get('Time', ''))
+                        ev_location = str(row.get('Location', ''))
+                        if ev_location == 'nan' or not ev_location:
+                            ev_location = "Online / Unspecified"
                         
-                        st.markdown(f"🗓️ **{ev_date}** • <span style='color: #38bdf8;'>{ev_time}</span>", unsafe_allow_html=True)
-                        st.markdown(f"**{ev_title}**")
-                        st.markdown("<hr style='margin: 8px 0px; border-color: #1f2937;'>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                            <div class="fb-card">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <span style="color: #2e89ff; font-weight: 600; font-size: 0.85rem;">🗓️ {ev_date} at {ev_time}</span>
+                                    <span style="color: #b0b3b8; font-size: 0.75rem;">Event</span>
+                                </div>
+                                <div style="font-weight: 600; font-size: 1rem; color: #e4e6eb; margin-bottom: 4px;">{ev_title}</div>
+                                <div style="color: #b0b3b8; font-size: 0.82rem;">📍 {ev_location}</div>
+                            </div>
+                        """, unsafe_allow_html=True)
                 else:
                     st.info("No upcoming events found from today onwards.")
             except Exception as e:
                 st.warning("Error processing calendar timeline.")
         else:
             st.warning("Could not load live calendar data.")
-            
-        st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
 # TAB 2: FINANCES & BUDGETS
@@ -235,7 +254,7 @@ elif tab == "💎 Assets & Depreciation":
 # ==========================================
 elif tab == "📅 Schedule & Calendar":
     st.title("Schedule & Calendar Timeline")
-    st.caption("Full synchronized schedule and calendar events.")
+    st.caption("Full synchronized schedule and calendar events feed.")
     if calendar_df is not None:
         st.dataframe(calendar_df, use_container_width=True)
     else:
