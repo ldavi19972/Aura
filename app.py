@@ -68,12 +68,12 @@ st.markdown("""
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
-        padding: 16px;
+        padding: 14px;
         text-align: center;
     }
     
     .metric-title {
-        font-size: 12px;
+        font-size: 11px;
         color: #94a3b8;
         font-weight: 600;
         text-transform: uppercase;
@@ -81,7 +81,7 @@ st.markdown("""
     }
 
     .metric-value {
-        font-size: 22px;
+        font-size: 20px;
         font-weight: 700;
     }
 
@@ -89,6 +89,89 @@ st.markdown("""
     .metric-negative { color: #fb7185; }
     .metric-neutral  { color: #38bdf8; }
     .metric-warning  { color: #facc15; }
+
+    /* Custom Goal Progress Cards */
+    .goal-card {
+        background: #161a22;
+        border: 1px solid #222734;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+    }
+
+    .goal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+
+    .goal-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #f8fafc;
+    }
+
+    .goal-badge {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 12px;
+        text-transform: uppercase;
+    }
+
+    .badge-saved { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid #16522c; }
+    .badge-progress { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #1d4ed8; }
+    .badge-waiting { background: rgba(250, 204, 21, 0.15); color: #facc15; border: 1px solid #713f12; }
+
+    .progress-bar-bg {
+        background: #222734;
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 8px 0;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .goal-footer {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    /* Cashflow Custom Display */
+    .cashflow-card {
+        background: #161a22;
+        border: 1px solid #222734;
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 12px;
+    }
+
+    .cf-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        border-bottom: 1px solid #1c212c;
+        font-size: 13px;
+    }
+
+    .cf-row:last-child {
+        border-bottom: none;
+    }
+
+    .cf-sub {
+        color: #94a3b8;
+        padding-left: 12px;
+        font-size: 12px;
+    }
 
     iframe {
         border: none !important;
@@ -152,15 +235,6 @@ def fetch_calendar_data(calendar_url, raw_url):
         st.error(f"Error fetching Raw Data: {e}")
 
     return data_map
-
-@st.cache_data(ttl=30)
-def fetch_finances_data(finances_url):
-    try:
-        df = pd.read_csv(finances_url, header=None)
-        return df
-    except Exception as e:
-        st.error(f"Error fetching Finances tab: {e}")
-        return pd.DataFrame()
 
 # -----------------------------------------------------------------------------
 # 4. Streamlit Main Tabs Layout
@@ -375,12 +449,12 @@ with tab_cal:
 
 
 # =============================================================================
-# TAB 2: FINANCIAL DASHBOARD
+# TAB 2: FINANCIAL DASHBOARD (REDESIGNED VISUAL UI)
 # =============================================================================
 with tab_fin:
-    st.markdown("<h2 style='margin-bottom: 20px; font-weight:700;'>💰 Financial Dashboard</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-bottom: 16px; font-weight:700;'>💰 Financial Dashboard</h2>", unsafe_allow_html=True)
     
-    # 1. Executive Summary Cards (Net Worth, Savings, Credit, Assets, Position)
+    # 1. Executive Metric Header
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown("""
@@ -413,65 +487,172 @@ with tab_fin:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    col_left, col_right = st.columns([1.2, 1])
+    # 2. Main Visual Area: Priorities First (Goals [55%] + Cash Flow [45%])
+    col_goals, col_cash = st.columns([1.2, 1])
 
-    # 2. Budget, Income & Expense Breakdown Table
-    with col_left:
-        st.markdown("<h4 style='font-size:16px; color:#cbd5e1; font-weight:700;'>📊 Cash Flow Overview</h4>", unsafe_allow_html=True)
-        
-        income_expenses_data = {
-            "Category": [
-                "Income (Salary + Transfers)", 
-                "  ↳ Salary", 
-                "  ↳ Transfers",
-                "Expenses (Bills + Budgets)", 
-                "  ↳ Rent", 
-                "  ↳ Electricity", 
-                "  ↳ Gym", 
-                "  ↳ Credit Card", 
-                "  ↳ RT Health", 
-                "  ↳ Internet", 
-                "  ↳ Groceries", 
-                "  ↳ Eating Out", 
-                "  ↳ Fun", 
-                "  ↳ Holidays",
-                "Difference (Net Savings Flow)"
-            ],
-            "Weekly": ["$1,814.00", "$1,424.00", "$390.00", "$1,096.72", "$721.25", "$18.62", "$35.20", "$25.00", "$35.34", "$11.31", "$100.00", "$100.00", "$50.00", "$254.62", "$717.28"],
-            "Monthly": ["$7,860.67", "$6,170.67", "$1,690.00", "$4,752.43", "$3,125.42", "$80.67", "$152.53", "$108.33", "$153.15", "$49.00", "$433.33", "$433.33", "$216.67", "$1,103.33", "$3,108.23"],
-            "Yearly": ["$94,328.00", "$74,048.00", "$20,280.00", "$57,029.20", "$37,505.00", "$968.00", "$1,830.40", "$1,300.00", "$1,837.80", "$588.00", "$5,200.00", "$5,200.00", "$2,600.00", "$13,240.00", "$37,298.80"]
-        }
-        
-        df_cashflow = pd.DataFrame(income_expenses_data)
-        st.dataframe(df_cashflow, use_container_width=True, hide_index=True)
+    # --- GOALS visual cards with progress bars ---
+    with col_goals:
+        st.markdown("<h4 style='font-size:16px; color:#cbd5e1; font-weight:700; margin-bottom:12px;'>🎯 Savings & Goal Tracker</h4>", unsafe_allow_html=True)
 
-    # 3. Savings Goals & Lines of Credit
-    with col_right:
-        st.markdown("<h4 style='font-size:16px; color:#cbd5e1; font-weight:700;'>🎯 Savings Goals</h4>", unsafe_allow_html=True)
-        savings_goals_data = {
-            "Goal": ["Holidays", "Italy", "New Zealand", "Adelaide", "Emergency Fund"],
-            "Target": ["Maintain", "$7,000.00", "$2,087.98", "$2,600.00", "$9,000.00"],
-            "End Date": ["—", "9-Sep-2026", "SAVED", "30-Sep-2026", "6-Jan-2027"],
-            "Weekly Contribution": ["$0.00", "$1,037.50", "SAVED", "$650.00 (WAITING)", "$692.31 (WAITING)"]
-        }
-        st.dataframe(pd.DataFrame(savings_goals_data), use_container_width=True, hide_index=True)
+        goals_list = [
+            {
+                "name": "New Zealand Trip",
+                "current": 2087.98,
+                "target": 2087.98,
+                "pct": 100,
+                "badge": "SAVED",
+                "badge_class": "badge-saved",
+                "color": "#4ade80",
+                "details": "Target Achieved • $0/wk needed"
+            },
+            {
+                "name": "Italy Trip",
+                "current": 1037.50,
+                "target": 7000.00,
+                "pct": 15,
+                "badge": "IN PROGRESS",
+                "badge_class": "badge-progress",
+                "color": "#38bdf8",
+                "details": "Target: 9-Sep-2026 • Contrib: $1,037.50/wk"
+            },
+            {
+                "name": "Emergency Fund",
+                "current": 0.00,
+                "target": 9000.00,
+                "pct": 0,
+                "badge": "WAITING",
+                "badge_class": "badge-waiting",
+                "color": "#facc15",
+                "details": "Starts 7-Oct-2026 • Target: $692.31/wk"
+            },
+            {
+                "name": "Adelaide Trip",
+                "current": 0.00,
+                "target": 2600.00,
+                "pct": 0,
+                "badge": "WAITING",
+                "badge_class": "badge-waiting",
+                "color": "#facc15",
+                "details": "Starts 2-Sep-2026 • Target: $650.00/wk"
+            }
+        ]
 
-        st.markdown("<h4 style='font-size:16px; color:#cbd5e1; font-weight:700; margin-top:20px;'>💳 Debt & Credit Lines</h4>", unsafe_allow_html=True)
-        credit_data = {
-            "Account": ["Credit Card", "Student Loan"],
-            "Owing": ["$5,000.00", "$21,117.95"],
-            "Repayment": ["$1.00 / wk", "$192.00 / wk"],
-            "Closing Date": ["10-Jun-2122", "19-Sep-2028"]
-        }
-        st.dataframe(pd.DataFrame(credit_data), use_container_width=True, hide_index=True)
+        for g in goals_list:
+            st.markdown(f"""
+            <div class="goal-card">
+                <div class="goal-header">
+                    <span class="goal-title">{g['name']}</span>
+                    <span class="goal-badge {g['badge_class']}">{g['badge']}</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" style="width: {g['pct']}%; background: {g['color']};"></div>
+                </div>
+                <div class="goal-footer">
+                    <span>${g['current']:,.2f} of ${g['target']:,.2f} ({g['pct']}%)</span>
+                    <span>{g['details']}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    # 4. Assets Overview
-    st.markdown("<h4 style='font-size:16px; color:#cbd5e1; font-weight:700; margin-top:10px;'>🛋️ Physical Assets & Valuation</h4>", unsafe_allow_html=True)
-    assets_data = {
-        "Asset Item": ["PS5", "Kindle", "Watch", "Washing Machine", "Fridge", "Couch", "Dining Room Set"],
-        "Purchase Date": ["30-Aug-2025", "18-Aug-2023", "18-Jul-2023", "15-Feb-2025", "15-Feb-2025", "15-Jul-2022", "15-Feb-2025"],
-        "Purchase Price": ["$749.00", "$269.00", "$423.76", "$500.00", "$687.00", "$1,453.64", "$268.95"],
-        "Depreciation Yearly": ["30.00%", "25.00%", "15.00%", "9.00%", "8.00%", "10.00%", "8.00%"],
-        "Current Valued Value": ["$533.73", "$114.03", "$257.44", "$434.38", "$606.65", "$946.23", "$237.50"]
-    }
-    st.dataframe(pd.DataFrame(assets_data), use_container_width=True, hide_index=True)
+    # --- CASH FLOW visual breakdown ---
+    with col_cash:
+        st.markdown("<h4 style='font-size:16px; color:#cbd5e1; font-weight:700; margin-bottom:12px;'>📊 Cash Flow Summary</h4>", unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="cashflow-card">
+            <div class="cf-row" style="font-weight:700; color:#4ade80;">
+                <span>Total Weekly Income</span>
+                <span>+$1,814.00 / wk</span>
+            </div>
+            <div class="cf-row cf-sub">
+                <span>↳ Salary</span>
+                <span>$1,424.00 / wk</span>
+            </div>
+            <div class="cf-row cf-sub">
+                <span>↳ Transfers</span>
+                <span>$390.00 / wk</span>
+            </div>
+        </div>
+
+        <div class="cashflow-card">
+            <div class="cf-row" style="font-weight:700; color:#fb7185;">
+                <span>Total Weekly Expenses</span>
+                <span>-$1,096.72 / wk</span>
+            </div>
+            <div class="cf-row cf-sub">
+                <span>↳ Fixed Bills (Rent, Gym, Card, etc.)</span>
+                <span>$846.72 / wk</span>
+            </div>
+            <div class="cf-row cf-sub">
+                <span>↳ Variable Budgets (Groceries, Fun, etc.)</span>
+                <span>$250.00 / wk</span>
+            </div>
+            <div class="cf-row cf-sub">
+                <span>↳ Holiday Allocation</span>
+                <span>$254.62 / wk</span>
+            </div>
+        </div>
+
+        <div class="cashflow-card" style="border-left: 4px solid #38bdf8;">
+            <div class="cf-row" style="font-weight:700; color:#38bdf8; font-size:14px;">
+                <span>Net Savings Flow</span>
+                <span>+$717.28 / wk</span>
+            </div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:4px;">
+                Equates to <b>+$3,108.23 / mo</b> and <b>+$37,298.80 / yr</b> net retention.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none; border-top:1px solid #222734; margin: 16px 0;'>", unsafe_allow_html=True)
+
+    # 3. Bottom Layer: Liabilities & Physical Assets Expander
+    b_col1, b_col2 = st.columns([1, 1])
+
+    with b_col1:
+        st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700;'>💳 Credit & Loan Repayments</h4>", unsafe_allow_html=True)
+        st.markdown("""
+        <div class="cashflow-card">
+            <div class="cf-row">
+                <div>
+                    <span style="font-weight:600; color:#fff;">Student Loan</span><br>
+                    <span style="font-size:10px; color:#94a3b8;">Payoff target: 19-Sep-2028</span>
+                </div>
+                <div style="text-align:right;">
+                    <span style="color:#fb7185; font-weight:700;">$21,117.95</span><br>
+                    <span style="font-size:11px; color:#94a3b8;">$192.00 / wk</span>
+                </div>
+            </div>
+            <div class="cf-row">
+                <div>
+                    <span style="font-weight:600; color:#fff;">Credit Card</span><br>
+                    <span style="font-size:10px; color:#94a3b8;">Payoff target: 10-Jun-2122</span>
+                </div>
+                <div style="text-align:right;">
+                    <span style="color:#fb7185; font-weight:700;">$5,000.00</span><br>
+                    <span style="font-size:11px; color:#94a3b8;">$1.00 / wk</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with b_col2:
+        st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700;'>🛋️ Physical Assets Valuation</h4>", unsafe_allow_html=True)
+        with st.expander("View Asset Valuation Details ($3,129.96 total)", expanded=False):
+            asset_items = [
+                {"item": "Couch", "price": "$1,453.64", "val": "$946.23"},
+                {"item": "Fridge", "price": "$687.00", "val": "$606.65"},
+                {"item": "PS5", "price": "$749.00", "val": "$533.73"},
+                {"item": "Washing Machine", "price": "$500.00", "val": "$434.38"},
+                {"item": "Watch", "price": "$423.76", "val": "$257.44"},
+                {"item": "Dining Set", "price": "$268.95", "val": "$237.50"},
+                {"item": "Kindle", "price": "$269.00", "val": "$114.03"}
+            ]
+            
+            for a in asset_items:
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-bottom:1px solid #1c212c;">
+                    <span style="color:#fff;">{a['item']}</span>
+                    <span style="color:#94a3b8;">Cost: {a['price']} &nbsp;|&nbsp; <b style="color:#38bdf8;">Value: {a['val']}</b></span>
+                </div>
+                """, unsafe_allow_html=True)
