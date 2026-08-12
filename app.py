@@ -25,8 +25,8 @@ tab = st.sidebar.radio("Navigation", ["📊 Dashboard", "💳 Finances & Budgets
 @st.cache_data(ttl=60)
 def load_live_data():
     # REPLACE THESE URLs with your actual Google Sheet CSV export links
-    finances_url = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/export?format=csv&gid=FINANCES_GID"
-    calendar_url = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/export?format=csv&gid=CALENDAR_GID"
+    finances_url = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/edit?gid=1688426207#gid=1688426207"
+    calendar_url = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/edit?gid=0#gid=0"
     
     try:
         finances = pd.read_csv(finances_url)
