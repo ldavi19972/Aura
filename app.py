@@ -5,7 +5,12 @@ import json
 import datetime
 
 # -----------------------------------------------------------------------------
-# 1. Page Configuration & Layout
+# 1. Hardcoded Google Sheet Configuration
+# -----------------------------------------------------------------------------
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=528057576"
+
+# -----------------------------------------------------------------------------
+# 2. Page Configuration & Layout
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Aura Calendar 2026",
@@ -44,45 +49,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. Google Sheets Data Fetching (Targeting 'Raw Data' Tab)
+# 3. Google Sheets Data Fetching
 # -----------------------------------------------------------------------------
-st.sidebar.title("⚙️ Google Sheets Sync")
-sheet_id = st.sidebar.text_input(
-    "Google Sheet ID or Full CSV URL",
-    placeholder="528057576#gid=528057576",
-    help="Enter either your Google Sheet ID or full CSV URL for the 'Raw Data' tab."
-)
-
 @st.cache_data(ttl=30)
-def load_raw_data_sheet(sheet_input):
+def load_raw_data_sheet(csv_url):
     """
-    Fetches and parses the 'Raw Data' tab from Google Sheets.
-    Handles columns: Date, Bill 1..N, Event 1..N, Status
+    Fetches and parses the 'Raw Data' tab directly from the hardcoded URL.
+    Handles columns: Date, Status, Bill 1..N, Event 1..N, Notes
     """
     data_map = {}
-    if not sheet_input:
-        return data_map
-
-    # Construct direct CSV export URL for 'Raw Data' tab
-    if "docs.google.com" in sheet_input:
-        if "export?format=csv" in sheet_input:
-            csv_url = sheet_input
-        else:
-            # Extract Sheet ID from full URL
-            parts = sheet_input.split('/d/')
-            if len(parts) > 1:
-                s_id = parts[1].split('/')[0]
-                csv_url = f"https://docs.google.com/spreadsheets/d/{s_id}/gviz/tq?tqx=out:csv&sheet=Raw%20Data"
-            else:
-                csv_url = sheet_input
-    else:
-        # Standard Sheet ID input
-        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_input}/gviz/tq?tqx=out:csv&sheet=Raw%20Data"
 
     try:
         df = pd.read_csv(csv_url)
-        
-        # Strip whitespaces from column headers
         df.columns = df.columns.str.strip()
 
         for _, row in df.iterrows():
@@ -127,11 +105,11 @@ def load_raw_data_sheet(sheet_input):
                     })
 
     except Exception as e:
-        st.sidebar.error(f"Error reading 'Raw Data' tab: {e}")
+        st.error(f"Error fetching data from Google Sheets: {e}")
 
     return data_map
 
-live_data = load_raw_data_sheet(sheet_id)
+live_data = load_raw_data_sheet(DEFAULT_SHEET_URL)
 json_data = json.dumps(live_data)
 
 # Current Date Setup
@@ -141,7 +119,7 @@ today_m_idx = today_date.month - 1
 today_d_num = today_date.day
 
 # -----------------------------------------------------------------------------
-# 3. HTML / JS Calendar Interface
+# 4. HTML / JS Calendar Interface
 # -----------------------------------------------------------------------------
 calendar_html = f"""
 <!DOCTYPE html>
@@ -502,12 +480,12 @@ calendar_html = f"""
         const eventsTab = document.getElementById('eventsTab');
         eventsTab.innerHTML = dayData.events.length > 0 
             ? dayData.events.map(e => `<div class="data-card"><div style="color:#fff;font-weight:600;">${{e.title}}</div></div>`).join('')
-            : `<p style="color:#64748b;">No events recorded in Raw Data tab for this date.</p>`;
+            : `<p style="color:#64748b;">No events recorded for this date.</p>`;
 
         const billsTab = document.getElementById('billsTab');
         billsTab.innerHTML = dayData.bills.length > 0 
             ? dayData.bills.map(b => `<div class="data-card bill"><div style="color:#fff;font-weight:600;">${{b.title}}</div></div>`).join('')
-            : `<p style="color:#64748b;">No bills recorded in Raw Data tab for this date.</p>`;
+            : `<p style="color:#64748b;">No bills recorded for this date.</p>`;
 
         const notesTab = document.getElementById('notesTab');
         notesTab.innerHTML = `<p style="color:#94a3b8;">${{dayData.notes || 'No notes found for this date.'}}</p>`;
