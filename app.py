@@ -55,7 +55,7 @@ st.markdown("""
 def load_raw_data_sheet(csv_url):
     """
     Fetches and parses the 'Raw Data' tab directly from the hardcoded URL.
-    Handles columns: Date, Status, Bill 1..N, Event 1..N, Notes
+    Handles columns: Date, Status, Bill 1..N, Event 1..N, Time 1..N, Location 1..N
     """
     data_map = {}
 
@@ -79,29 +79,59 @@ def load_raw_data_sheet(csv_url):
                 data_map[date_key] = {
                     "status": str(row.get("Status", "Working")).strip(),
                     "events": [],
-                    "bills": [],
-                    "notes": str(row.get("Notes", "")).replace("nan", "")
+                    "bills": []
                 }
 
-            # Parse all Bill columns (Bill 1, Bill 2, Bill 3, etc.)
-            bill_cols = [c for c in df.columns if c.startswith("Bill")]
-            for col in bill_cols:
-                val = str(row.get(col, "")).replace("nan", "").strip()
-                if val:
-                    data_map[date_key]["bills"].append({
-                        "title": val,
-                        "amount": "",
-                        "due": "Due Today"
-                    })
-
-            # Parse all Event columns (Event 1, Event 2, Event 3, etc.)
+            # Parse all Event columns (Event 1, Event 2, etc.) & linked Time/Location
             event_cols = [c for c in df.columns if c.startswith("Event")]
             for col in event_cols:
                 val = str(row.get(col, "")).replace("nan", "").strip()
                 if val:
+                    suffix = col.replace("Event", "").strip()
+                    
+                    # Look for corresponding Time column
+                    time_val = ""
+                    for t_col in [f"Time {suffix}", f"Event {suffix} Time", f"Time{suffix}", "Time"]:
+                        if t_col in df.columns and str(row.get(t_col, "")).replace("nan", "").strip():
+                            time_val = str(row.get(t_col, "")).replace("nan", "").strip()
+                            break
+
+                    # Look for corresponding Location/Address column
+                    loc_val = ""
+                    for l_col in [f"Location {suffix}", f"Event {suffix} Location", f"Address {suffix}", f"Location{suffix}", "Location", "Address"]:
+                        if l_col in df.columns and str(row.get(l_col, "")).replace("nan", "").strip():
+                            loc_val = str(row.get(l_col, "")).replace("nan", "").strip()
+                            break
+
                     data_map[date_key]["events"].append({
                         "title": val,
-                        "time": "Scheduled"
+                        "time": time_val,
+                        "location": loc_val
+                    })
+
+            # Parse all Bill columns (Bill 1, Bill 2, etc.) & linked Amount/Time
+            bill_cols = [c for c in df.columns if c.startswith("Bill")]
+            for col in bill_cols:
+                val = str(row.get(col, "")).replace("nan", "").strip()
+                if val:
+                    suffix = col.replace("Bill", "").strip()
+                    
+                    amt_val = ""
+                    for a_col in [f"Amount {suffix}", f"Bill {suffix} Amount", f"Amount{suffix}", "Amount"]:
+                        if a_col in df.columns and str(row.get(a_col, "")).replace("nan", "").strip():
+                            amt_val = str(row.get(a_col, "")).replace("nan", "").strip()
+                            break
+
+                    time_val = ""
+                    for t_col in [f"Time {suffix}", f"Bill {suffix} Time", "Time"]:
+                        if t_col in df.columns and str(row.get(t_col, "")).replace("nan", "").strip():
+                            time_val = str(row.get(t_col, "")).replace("nan", "").strip()
+                            break
+
+                    data_map[date_key]["bills"].append({
+                        "title": val,
+                        "amount": amt_val,
+                        "time": time_val
                     })
 
     except Exception as e:
@@ -344,13 +374,27 @@ calendar_html = f"""
     .data-card {{
         background: #1c212c;
         border-left: 3px solid #38bdf8;
-        padding: 8px 12px;
-        border-radius: 4px;
-        margin-bottom: 6px;
+        padding: 10px 14px;
+        border-radius: 6px;
+        margin-bottom: 8px;
     }}
 
     .data-card.bill {{
         border-left-color: #f59e0b;
+    }}
+
+    .card-meta {{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 6px;
+        font-size: 11px;
+    }}
+
+    .meta-item {{
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }}
 </style>
 </head>
@@ -386,12 +430,10 @@ calendar_html = f"""
     <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('eventsTab', this)">Events & Schedule</button>
         <button class="tab-btn" onclick="switchTab('billsTab', this)">Bills Due</button>
-        <button class="tab-btn" onclick="switchTab('notesTab', this)">Day Notes</button>
     </div>
 
     <div id="eventsTab" class="tab-content active"></div>
     <div id="billsTab" class="tab-content"></div>
-    <div id="notesTab" class="tab-content"></div>
 </div>
 
 <script>
@@ -475,20 +517,49 @@ calendar_html = f"""
         const dStr = String(day).padStart(2, '0');
         const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
 
-        const dayData = sheetData[dateKey] || {{ events: [], bills: [], notes: '' }};
+        const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
         
+        // Render Events
         const eventsTab = document.getElementById('eventsTab');
         eventsTab.innerHTML = dayData.events.length > 0 
-            ? dayData.events.map(e => `<div class="data-card"><div style="color:#fff;font-weight:600;">${{e.title}}</div></div>`).join('')
+            ? dayData.events.map(e => {{
+                let metaHtml = '';
+                if (e.time) {{
+                    metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>`;
+                }}
+                if (e.location) {{
+                    metaHtml += `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>`;
+                }}
+                
+                return `
+                    <div class="data-card">
+                        <div style="color:#fff; font-weight:600;">${{e.title}}</div>
+                        ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
+                    </div>
+                `;
+            }}).join('')
             : `<p style="color:#64748b;">No events recorded for this date.</p>`;
 
+        // Render Bills
         const billsTab = document.getElementById('billsTab');
         billsTab.innerHTML = dayData.bills.length > 0 
-            ? dayData.bills.map(b => `<div class="data-card bill"><div style="color:#fff;font-weight:600;">${{b.title}}</div></div>`).join('')
-            : `<p style="color:#64748b;">No bills recorded for this date.</p>`;
+            ? dayData.bills.map(b => {{
+                let metaHtml = '';
+                if (b.amount) {{
+                    metaHtml += `<span class="meta-item" style="color:#f59e0b; font-weight:600;">💰 ${{b.amount}}</span>`;
+                }}
+                if (b.time) {{
+                    metaHtml += `<span class="meta-item" style="color:#38bdf8;">⏰ ${{b.time}}</span>`;
+                }}
 
-        const notesTab = document.getElementById('notesTab');
-        notesTab.innerHTML = `<p style="color:#94a3b8;">${{dayData.notes || 'No notes found for this date.'}}</p>`;
+                return `
+                    <div class="data-card bill">
+                        <div style="color:#fff; font-weight:600;">${{b.title}}</div>
+                        ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
+                    </div>
+                `;
+            }}).join('')
+            : `<p style="color:#64748b;">No bills recorded for this date.</p>`;
     }}
 
     function switchTab(tabId, btn) {{
