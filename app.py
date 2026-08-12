@@ -372,6 +372,7 @@ if "preview_date" in query_params:
     except:
         pass
     st.query_params.clear()
+    st.rerun()
 
 focus_date_val = st.session_state["focus_date"]
 focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_val, datetime.date) else str(focus_date_val)
@@ -488,7 +489,7 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date to preview details & enable Focus View button below</div>
+            <div class="click-hint">💡 Click any date to preview details & update Focus View button</div>
         </div>
     </div>
 
@@ -609,11 +610,13 @@ if current_tab == "Calendar":
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
 
-            // Bridge selected date cleanly to Streamlit via URL history update
+            // Trigger immediate Streamlit rerun using location reload bridge
             try {{
                 const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
-                window.top.history.replaceState(null, '', targetUrl);
-            }} catch(e) {{}}
+                window.top.location.href = targetUrl;
+            }} catch(e) {{
+                window.parent.location.href = '?preview_date=' + dateKey;
+            }}
         }}
 
         function switchTab(tabId, btn) {{
@@ -626,7 +629,13 @@ if current_tab == "Calendar":
         renderGrid();
         setTimeout(() => {{
             const todayCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
-            if (todayCell) selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', todayCell);
+            if (todayCell) {{
+                // Only select today if no active preview date is currently set
+                const urlParams = new URLSearchParams(window.top.location.search);
+                if (!urlParams.has('preview_date')) {{
+                    selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', todayCell);
+                }}
+            }}
         }}, 50);
     </script>
 
@@ -635,12 +644,14 @@ if current_tab == "Calendar":
     """
     components.html(calendar_html, height=695, scrolling=False)
 
-    # Capture preview date selection from HTML calendar
+    # Capture preview date selection from HTML calendar and trigger instant rerun
     if "preview_date" in query_params:
         try:
             st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
         except:
             pass
+        st.query_params.clear()
+        st.rerun()
 
     # Native Streamlit Action Button safely rendered right below calendar component
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
