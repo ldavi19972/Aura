@@ -365,27 +365,53 @@ if "tab" in query_params:
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
-# 5. Render Custom Navigation Bar
+# 5. Render Custom Navigation Bar (Shorter & Refined Color Scheme)
 # -----------------------------------------------------------------------------
-col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
+col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.0, 1.1, 1.2, 5])
 
 with col_nav1:
     is_cal_active = (current_tab == "Calendar")
-    if st.button("📅  Calendar & Schedule", use_container_width=True, type="primary" if is_cal_active else "secondary"):
+    btn_type = "primary" if is_cal_active else "secondary"
+    if st.button("📅 Calendar", use_container_width=True, type=btn_type):
         st.session_state["active_tab"] = "Calendar"
         st.rerun()
 
 with col_nav2:
     is_focus_active = (current_tab == "Focus")
-    if st.button("🔍  Focus View", use_container_width=True, type="primary" if is_focus_active else "secondary"):
+    btn_type = "primary" if is_focus_active else "secondary"
+    if st.button("🔍 Focus View", use_container_width=True, type=btn_type):
         st.session_state["active_tab"] = "Focus"
         st.rerun()
 
 with col_nav3:
     is_fin_active = (current_tab == "Finances")
-    if st.button("💰  Finances & Net Worth", use_container_width=True, type="primary" if is_fin_active else "secondary"):
+    btn_type = "primary" if is_fin_active else "secondary"
+    if st.button("💰 Finances & Net Worth", use_container_width=True, type=btn_type):
         st.session_state["active_tab"] = "Finances"
         st.rerun()
+
+st.markdown("""
+<style>
+    /* Sleek custom styling for secondary navigation buttons for high legibility */
+    button[kind="secondary"] {
+        background-color: #161a22 !important;
+        border: 1px solid #28303f !important;
+        color: #e2e8f0 !important;
+        font-weight: 600 !important;
+    }
+    button[kind="secondary"]:hover {
+        background-color: #1e2532 !important;
+        border-color: #3b82f6 !important;
+        color: #ffffff !important;
+    }
+    button[kind="primary"] {
+        background-color: #3b82f6 !important;
+        border: 1px solid #60a5fa !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
@@ -489,12 +515,8 @@ if current_tab == "Calendar":
 
     <script>
         const YEAR = 2026;
-        
-        // Dynamically fetch real live date from the browser's local clock
         const now = new Date();
         const TODAY = {{ month: now.getMonth(), day: now.getDate() }};
-        
-        // Format today's date string for top header
         const options = {{ weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }};
         document.getElementById('todayText').innerText = now.toLocaleDateString('en-US', options);
 
@@ -606,7 +628,6 @@ if current_tab == "Calendar":
         }}
 
         renderGrid();
-        // Automatically select and preview Today's live browser date on load
         setTimeout(() => {{
             const targetCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
             if (targetCell) {{
@@ -628,7 +649,6 @@ if current_tab == "Calendar":
 elif current_tab == "Focus":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
-    # Force alignment with local time (+10 hours UTC offset) to ensure correct current date
     focus_date_val = (datetime.datetime.utcnow() + datetime.timedelta(hours=10)).date()
     focus_date_str = focus_date_val.strftime("%Y-%m-%d")
     sel_formatted = focus_date_val.strftime("%A, %B %d, %Y")
@@ -656,7 +676,7 @@ elif current_tab == "Focus":
         if curr_data["bills"]:
             for b in curr_data["bills"]:
                 st.markdown(f"""
-                <div class="data-card bill-card">
+                <div class="goal-card" style="border-left-color: #facc15;">
                     <div style="color:#fff; font-weight:600; font-size: 12px;">{b['title']}</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -683,41 +703,51 @@ elif current_tab == "Focus":
             </div>
             """, unsafe_allow_html=True)
 
-    with st.expander("🔍 View Detailed Schedule for Next 7 Days"):
-        for i in range(1, 8):
-            future_dt = focus_date_val + datetime.timedelta(days=i)
-            f_key = future_dt.strftime("%Y-%m-%d")
-            f_data = live_data.get(f_key, {"events": [], "bills": []})
+    # Individual Expanders for each day of the upcoming week
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    for i in range(1, 8):
+        future_dt = focus_date_val + datetime.timedelta(days=i)
+        f_key = future_dt.strftime("%Y-%m-%d")
+        f_data = live_data.get(f_key, {"events": [], "bills": []})
+        day_title = future_dt.strftime('%A, %b %d')
+        
+        ev_count = len(f_data["events"])
+        bill_count = len(f_data["bills"])
+        expander_label = f"📅 {day_title} — {ev_count} event(s), {bill_count} bill(s)"
+        
+        with st.expander(expander_label):
             if f_data["events"] or f_data["bills"]:
-                st.markdown(f"<b style='color:#f8fafc; font-size:12px;'>{future_dt.strftime('%A, %b %d')}:</b>", unsafe_allow_html=True)
                 for ev in f_data["events"]:
-                    st.markdown(f"<span style='color:#38bdf8; font-size:11px; margin-left:10px;'>• Event: {ev['title']}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='color:#38bdf8; font-size:12px; margin-bottom:4px;'>• <b>Event:</b> {ev['title']} {f'(@ {ev[\"time\"]})' if ev['time'] else ''}</div>", unsafe_allow_html=True)
                 for b in f_data["bills"]:
-                    st.markdown(f"<span style='color:#facc15; font-size:11px; margin-left:10px;'>• Bill: {b['title']}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='color:#facc15; font-size:12px; margin-bottom:4px;'>• <b>Bill:</b> {b['title']}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='color:#64748b; font-size:12px;'>No events or bills scheduled for this day.</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='section-header' style='margin-top:20px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
+    # Redesigned Month Overview View (Structured Card Grid instead of plain text list)
+    st.markdown("<div class='section-header' style='margin-top:25px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
     
-    month_events_summary = []
+    month_events_list = []
     for i in range(8, 38):
         m_dt = focus_date_val + datetime.timedelta(days=i)
         m_key = m_dt.strftime("%Y-%m-%d")
         m_data = live_data.get(m_key)
         if m_data and (m_data["events"] or m_data["bills"]):
             titles = [e['title'] for e in m_data["events"]] + [b['title'] for b in m_data["bills"]]
-            month_events_summary.append({
-                "date": m_dt.strftime("%b %d (%a)"),
-                "items": ", ".join(titles)
+            month_events_list.append({
+                "date_str": m_dt.strftime("%A, %b %d, %Y"),
+                "items": titles
             })
 
-    if month_events_summary:
-        summary_rows = "".join([
-            f'''<div class="cf-row">
-                <span style="color:#38bdf8; font-weight:600; width: 110px; flex-shrink: 0;">{item["date"]}</span>
-                <span style="color:#cbd5e1; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{item["items"]}</span>
-            </div>'''
-            for item in month_events_summary
-        ])
-        st.markdown(f'<div class="cashflow-card" style="max-height: 160px; overflow-y: auto;">{summary_rows}</div>', unsafe_allow_html=True)
+    if month_events_list:
+        for item in month_events_list:
+            items_html = "".join([f"<span style='background:#1e293b; color:#38bdf8; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; display:inline-block; margin:2px;'>{it}</span>" for it in item["items"]])
+            st.markdown(f"""
+            <div class="goal-card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px;">
+                <div style="font-weight: 700; color: #f8fafc; font-size: 13px; min-width: 160px;">{item["date_str"]}</div>
+                <div style="text-align: right; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;">{items_html}</div>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
 
