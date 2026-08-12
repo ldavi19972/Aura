@@ -1,37 +1,119 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import pandas as pd
+import json
+import datetime
 
-# Page configuration for full-width layout
+# -----------------------------------------------------------------------------
+# 1. Page Configuration & Full-Bleed Edge-to-Edge CSS
+# -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Calendar 26' Interactive Dashboard",
+    page_title="Aura Calendar 2026",
     page_icon="📅",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS to eliminate Streamlit's default margins/padding & double scrollbars
+# Eliminate all default Streamlit padding, margins, headers, and white background borders
 st.markdown("""
 <style>
-    /* Remove padding around main Streamlit block */
+    /* Force full viewport background to eliminate white borders */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"], .stApp {
+        background-color: #0e1117 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow-x: hidden !important;
+    }
+    
+    /* Remove padding around main content block */
     .main .block-container {
-        padding-top: 0.5rem !important;
-        padding-bottom: 0rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding: 0rem !important;
+        margin: 0rem !important;
         max-width: 100% !important;
     }
-    /* Hide Streamlit header & footer elements for clean full-screen look */
+
+    /* Hide Streamlit default header and footer */
     header, footer, #MainMenu {
-        visibility: hidden;
-        height: 0px;
+        visibility: hidden !important;
+        height: 0px !important;
     }
+
     iframe {
         border: none !important;
+        width: 100vw !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-calendar_html = """
+# -----------------------------------------------------------------------------
+# 2. Live Google Sheets Data Fetching
+# -----------------------------------------------------------------------------
+# Replace this URL with your published Google Sheet CSV link
+# (File -> Share -> Publish to Web -> Select 'CSV')
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=csv"
+
+@st.cache_data(ttl=60)  # Caches for 60 seconds then auto-refreshes
+def fetch_google_sheets_data():
+    """
+    Fetches schedule, bills, and events from Google Sheets.
+    Returns a dictionary keyed by date ("YYYY-MM-DD").
+    """
+    data_by_date = {}
+    
+    try:
+        # Load CSV data from Google Sheets
+        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        
+        # Expected columns in your sheet: Date, Event_Title, Event_Time, Bill_Title, Bill_Amount, Notes
+        for _, row in df.iterrows():
+            date_key = str(row.get("Date", "")).strip()  # Format: "2026-08-12"
+            if not date_key:
+                continue
+
+            if date_key not in data_by_date:
+                data_by_date[date_key] = {"events": [], "bills": [], "notes": ""}
+
+            # Parse Events
+            if pd.notna(row.get("Event_Title")) and row.get("Event_Title"):
+                data_by_date[date_key]["events"].append({
+                    "title": str(row.get("Event_Title")),
+                    "time": str(row.get("Event_Time", "All Day"))
+                })
+
+            # Parse Bills
+            if pd.notna(row.get("Bill_Title")) and row.get("Bill_Title"):
+                data_by_date[date_key]["bills"].append({
+                    "title": str(row.get("Bill_Title")),
+                    "amount": str(row.get("Bill_Amount", "$0.00")),
+                    "due": str(row.get("Bill_Due_Status", "Due Today"))
+                })
+
+            # Parse Notes
+            if pd.notna(row.get("Notes")) and row.get("Notes"):
+                data_by_date[date_key]["notes"] = str(row.get("Notes"))
+
+    except Exception as e:
+        # Fallback empty structure if URL is not yet connected
+        pass
+
+    return data_by_date
+
+# Fetch live sheet data
+live_sheet_data = fetch_google_sheets_data()
+json_live_data = json.dumps(live_sheet_data)
+
+# Current Date Setup
+today_date = datetime.date.today()
+today_formatted = today_date.strftime("%A, %B %d, %Y")
+today_month_idx = today_date.month - 1  # 0-indexed (0 = Jan, 7 = Aug)
+today_day_num = today_date.day
+
+# -----------------------------------------------------------------------------
+# 3. Full-Screen Interactive Web Component
+# -----------------------------------------------------------------------------
+calendar_html = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,22 +121,24 @@ calendar_html = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    * {
+    * {{
         box-sizing: border-box;
         margin: 0;
         padding: 0;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
+    }}
 
-    body {
+    html, body {{
         background-color: #0e1117;
         color: #f1f5f9;
-        padding: 12px;
+        width: 100%;
+        height: 100vh;
+        padding: 16px;
         overflow-x: hidden;
-    }
+    }}
 
     /* Top Navigation / Today Bar */
-    .top-bar {
+    .top-bar {{
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -63,15 +147,15 @@ calendar_html = """
         border-radius: 10px;
         padding: 14px 20px;
         margin-bottom: 16px;
-    }
+    }}
 
-    .today-info {
+    .today-info {{
         display: flex;
         align-items: center;
         gap: 12px;
-    }
+    }}
 
-    .today-badge {
+    .today-badge {{
         background: rgba(56, 189, 248, 0.15);
         color: #38bdf8;
         border: 1px solid rgba(56, 189, 248, 0.4);
@@ -81,45 +165,45 @@ calendar_html = """
         font-weight: 700;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-    }
+    }}
 
-    .today-date-text {
+    .today-date-text {{
         font-size: 18px;
         font-weight: 700;
         color: #f8fafc;
-    }
+    }}
 
-    .year-title {
+    .year-title {{
         font-size: 14px;
         color: #64748b;
         font-weight: 600;
-    }
+    }}
 
     /* Grid Layout Container */
-    .calendar-container {
+    .calendar-container {{
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
         padding: 16px;
         overflow-x: auto;
-    }
+    }}
 
-    table.cal-grid {
+    table.cal-grid {{
         width: 100%;
         border-collapse: separate;
         border-spacing: 2px;
-    }
+    }}
 
-    th.col-header {
+    th.col-header {{
         color: #64748b;
         font-size: 11px;
         font-weight: 600;
         text-align: center;
         padding: 4px 0;
         min-width: 28px;
-    }
+    }}
 
-    td.month-label {
+    td.month-label {{
         color: #94a3b8;
         font-size: 12px;
         font-weight: 600;
@@ -127,10 +211,10 @@ calendar_html = """
         white-space: nowrap;
         text-align: left;
         min-width: 90px;
-    }
+    }}
 
     /* Calendar Day Cells */
-    .day-cell {
+    .day-cell {{
         height: 30px;
         min-width: 28px;
         border-radius: 5px;
@@ -144,44 +228,44 @@ calendar_html = """
         vertical-align: middle;
         border: 1px solid transparent;
         position: relative;
-    }
+    }}
 
-    .day-cell:hover {
+    .day-cell:hover {{
         transform: scale(1.08);
         border-color: #ffffff55 !important;
         z-index: 5;
-    }
+    }}
 
     /* Today Highlight Ring */
-    .day-cell.is-today {
+    .day-cell.is-today {{
         box-shadow: 0 0 0 2px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.6) !important;
         border-color: #38bdf8 !important;
         z-index: 4;
-    }
+    }}
 
     /* Status Color Themes */
-    .status-empty { background-color: #1a1e27; color: #475569; }
-    .status-work { background-color: #133a20; color: #4ade80; border-color: #16522c; }
-    .status-pub-holiday { background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }
-    .status-holiday { background-color: #4c0519; color: #fb7185; border-color: #9f1239; }
-    .status-getaway { background-color: #422006; color: #facc15; border-color: #713f12; }
-    .status-work-trip { background-color: #3b0764; color: #c084fc; border-color: #6b21a8; }
+    .status-empty {{ background-color: #1a1e27; color: #475569; }}
+    .status-work {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
+    .status-pub-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
+    .status-holiday {{ background-color: #4c0519; color: #fb7185; border-color: #9f1239; }}
+    .status-getaway {{ background-color: #422006; color: #facc15; border-color: #713f12; }}
+    .status-work-trip {{ background-color: #3b0764; color: #c084fc; border-color: #6b21a8; }}
 
     /* Active Selected State */
-    .day-cell.selected {
+    .day-cell.selected {{
         outline: 2px solid #ffffff;
         outline-offset: 1px;
-    }
+    }}
 
     /* Legend Bar */
-    .legend-bar {
+    .legend-bar {{
         display: flex;
         gap: 12px;
         margin-top: 14px;
         flex-wrap: wrap;
-    }
+    }}
 
-    .legend-item {
+    .legend-item {{
         display: flex;
         align-items: center;
         gap: 6px;
@@ -191,52 +275,52 @@ calendar_html = """
         padding: 4px 10px;
         border-radius: 5px;
         border: 1px solid #28303f;
-    }
+    }}
 
-    .legend-dot {
+    .legend-dot {{
         width: 8px;
         height: 8px;
         border-radius: 2px;
-    }
+    }}
 
     /* Detail Panel & Tabbed Interface */
-    .detail-panel {
+    .detail-panel {{
         margin-top: 16px;
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
         padding: 20px;
-    }
+    }}
 
-    .panel-header {
+    .panel-header {{
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 16px;
-    }
+    }}
 
-    .panel-title {
+    .panel-title {{
         font-size: 16px;
         font-weight: 700;
         color: #f8fafc;
-    }
+    }}
 
-    .status-badge {
+    .status-badge {{
         font-size: 11px;
         padding: 3px 10px;
         border-radius: 12px;
         font-weight: 600;
-    }
+    }}
 
     /* Tabs Styling */
-    .tab-bar {
+    .tab-bar {{
         display: flex;
         gap: 6px;
         border-bottom: 1px solid #222734;
         margin-bottom: 16px;
-    }
+    }}
 
-    .tab-btn {
+    .tab-btn {{
         background: none;
         border: none;
         color: #64748b;
@@ -246,48 +330,48 @@ calendar_html = """
         cursor: pointer;
         border-bottom: 2px solid transparent;
         transition: all 0.15s;
-    }
+    }}
 
-    .tab-btn.active {
+    .tab-btn.active {{
         color: #38bdf8;
         border-bottom-color: #38bdf8;
-    }
+    }}
 
-    .tab-content {
+    .tab-content {{
         display: none;
         color: #94a3b8;
         font-size: 13px;
         line-height: 1.5;
-    }
+    }}
 
-    .tab-content.active {
+    .tab-content.active {{
         display: block;
-    }
+    }}
 
     /* Dynamic Data Cards */
-    .data-card {
+    .data-card {{
         background: #1c212c;
         border-left: 3px solid #38bdf8;
         padding: 10px 14px;
         border-radius: 5px;
         margin-bottom: 8px;
-    }
+    }}
 
-    .data-card.bill {
+    .data-card.bill {{
         border-left-color: #f59e0b;
-    }
+    }}
 
-    .data-title {
+    .data-title {{
         color: #f8fafc;
         font-weight: 600;
         font-size: 13px;
-    }
+    }}
 
-    .data-sub {
+    .data-sub {{
         color: #64748b;
         font-size: 11px;
         margin-top: 2px;
-    }
+    }}
 </style>
 </head>
 <body>
@@ -296,9 +380,9 @@ calendar_html = """
 <div class="top-bar">
     <div class="today-info">
         <span class="today-badge">Today</span>
-        <span class="today-date-text" id="todayTextDisplay">Wednesday, August 12, 2026</span>
+        <span class="today-date-text">{today_formatted}</span>
     </div>
-    <div class="year-title">Annual Schedule Sync • 2026</div>
+    <div class="year-title">Live Google Sheets Sync • 2026</div>
 </div>
 
 <!-- Linear Calendar Grid -->
@@ -318,7 +402,7 @@ calendar_html = """
 <!-- Interactive Detail Panel -->
 <div class="detail-panel" id="detailPanel">
     <div class="panel-header">
-        <div class="panel-title" id="selectedDateTitle">August 12, 2026</div>
+        <div class="panel-title" id="selectedDateTitle">Select a date</div>
         <div class="status-badge status-work" id="selectedStatusBadge">Working</div>
     </div>
 
@@ -335,156 +419,133 @@ calendar_html = """
 
 <script>
     const YEAR = 2026;
-    const TODAY = { month: 7, day: 12 }; // August 12, 2026 (0-indexed month: 7 = August)
-    
+    const TODAY = {{ month: {today_month_idx}, day: {today_day_num} }};
+    const liveGoogleSheetData = {json_live_data};
+
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    // Mock Live Database synced by Date Key ("YYYY-MM-DD")
-    const database = {
-        "2026-08-12": {
-            events: [
-                { title: "Team Sync & Standup", time: "09:00 AM - 09:30 AM" },
-                { title: "Aura Dashboard Sprint Review", time: "02:00 PM - 03:00 PM" }
-            ],
-            bills: [
-                { title: "Google Workspace Subscription", amount: "$18.00 AUD", due: "Auto-debit today" }
-            ],
-            notes: "Focus on finalizing calendar interface sync today."
-        },
-        "2026-08-25": {
-            events: [{ title: "Flight to Sydney (Get-away)", time: "08:15 AM" }],
-            bills: [{ title: "Rent Payment", amount: "$520.00 AUD", due: "Due today" }],
-            notes: "Pack bags night before."
-        },
-        "2026-11-16": {
-            events: [{ title: "Q4 Strategy Conference (Work Trip)", time: "All Day" }],
-            bills: [],
-            notes: "Prepare presentation slides."
-        }
-    };
-
-    function getStatus(monthIdx, day) {
-        if (monthIdx === 7 && day >= 23 && day <= 29) return { class: 'status-holiday', name: 'Holiday' };
-        if (monthIdx === 10 && day >= 16 && day <= 20) return { class: 'status-work-trip', name: 'Work Trip' };
-        if (monthIdx === 10 && (day === 1 || day >= 30)) return { class: 'status-getaway', name: 'Get-away' };
-        if (monthIdx === 0 && day === 1) return { class: 'status-pub-holiday', name: 'Public Holiday' };
+    function getStatus(monthIdx, day) {{
+        if (monthIdx === 7 && day >= 23 && day <= 29) return {{ class: 'status-holiday', name: 'Holiday' }};
+        if (monthIdx === 10 && day >= 16 && day <= 20) return {{ class: 'status-work-trip', name: 'Work Trip' }};
+        if (monthIdx === 10 && (day === 1 || day >= 30)) return {{ class: 'status-getaway', name: 'Get-away' }};
+        if (monthIdx === 0 && day === 1) return {{ class: 'status-pub-holiday', name: 'Public Holiday' }};
         
         const dateObj = new Date(YEAR, monthIdx, day);
         const dayOfWeek = dateObj.getDay();
-        if (dayOfWeek === 0 || dayOfWeek === 6) return { class: 'status-empty', name: 'Weekend' };
+        if (dayOfWeek === 0 || dayOfWeek === 6) return {{ class: 'status-empty', name: 'Weekend' }};
         
-        return { class: 'status-work', name: 'Working' };
-    }
+        return {{ class: 'status-work', name: 'Working' }};
+    }}
 
-    function renderGrid() {
+    function renderGrid() {{
         const grid = document.getElementById('calendarGrid');
         let html = '<thead><tr><th class="col-header">2026</th>';
         
-        for (let d = 1; d <= 31; d++) {
-            html += `<th class="col-header">${d}</th>`;
-        }
+        for (let d = 1; d <= 31; d++) {{
+            html += `<th class="col-header">${{d}}</th>`;
+        }}
         html += '</tr></thead><tbody>';
 
-        months.forEach((mName, mIdx) => {
-            html += `<tr><td class="month-label">${mName}</td>`;
+        months.forEach((mName, mIdx) => {{
+            html += `<tr><td class="month-label">${{mName}}</td>`;
             const totalDays = daysInMonths[mIdx];
 
-            for (let d = 1; d <= 31; d++) {
-                if (d <= totalDays) {
+            for (let d = 1; d <= 31; d++) {{
+                if (d <= totalDays) {{
                     const dateObj = new Date(YEAR, mIdx, d);
-                    const dayLetter = dateObj.toLocaleDateString('en-US', { weekday: 'narrow' });
+                    const dayLetter = dateObj.toLocaleDateString('en-US', {{ weekday: 'narrow' }});
                     const status = getStatus(mIdx, d);
                     
                     const isToday = (mIdx === TODAY.month && d === TODAY.day);
                     const todayClass = isToday ? 'is-today' : '';
                     
-                    html += `<td class="day-cell ${status.class} ${todayClass}" 
-                                 id="cell-${mIdx}-${d}"
-                                 onclick="selectDate(${mIdx}, ${d}, '${mName}', '${status.name}', '${status.class}', this)">
-                                 ${dayLetter}
+                    html += `<td class="day-cell ${{status.class}} ${{todayClass}}" 
+                                 id="cell-${{mIdx}}-${{d}}"
+                                 onclick="selectDate(${{mIdx}}, ${{d}}, '${{mName}}', '${{status.name}}', '${{status.class}}', this)">
+                                 ${{dayLetter}}
                              </td>`;
-                } else {
+                }} else {{
                     html += '<td style="background:transparent;"></td>';
-                }
-            }
+                }}
+            }}
             html += '</tr>';
-        });
+        }});
 
         html += '</tbody>';
         grid.innerHTML = html;
-    }
+    }}
 
-    function selectDate(mIdx, day, monthName, statusName, statusClass, element) {
+    function selectDate(mIdx, day, monthName, statusName, statusClass, element) {{
         document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
-        element.classList.add('selected');
+        if (element) element.classList.add('selected');
 
-        document.getElementById('selectedDateTitle').innerText = `${monthName} ${day}, ${YEAR}`;
+        document.getElementById('selectedDateTitle').innerText = `${{monthName}} ${{day}}, ${{YEAR}}`;
         
         const badge = document.getElementById('selectedStatusBadge');
         badge.innerText = statusName;
-        badge.className = `status-badge ${statusClass}`;
+        badge.className = `status-badge ${{statusClass}}`;
 
         // Format Date Key (YYYY-MM-DD)
         const mStr = String(mIdx + 1).padStart(2, '0');
         const dStr = String(day).padStart(2, '0');
-        const dateKey = `${YEAR}-${mStr}-${dStr}`;
+        const dateKey = `${{YEAR}}-${{mStr}}-${{dStr}}`;
 
-        // Sync Data Content into Tabs
-        const dayData = database[dateKey] || { events: [], bills: [], notes: '' };
+        // Sync Live Data Content from Google Sheets into Tabs
+        const dayData = liveGoogleSheetData[dateKey] || {{ events: [], bills: [], notes: '' }};
         
         // Render Events
         const eventsContainer = document.getElementById('eventsTab');
-        if (dayData.events.length > 0) {
+        if (dayData.events && dayData.events.length > 0) {{
             eventsContainer.innerHTML = dayData.events.map(e => `
                 <div class="data-card">
-                    <div class="data-title">${e.title}</div>
-                    <div class="data-sub">🕒 ${e.time}</div>
+                    <div class="data-title">${{e.title}}</div>
+                    <div class="data-sub">🕒 ${{e.time}}</div>
                 </div>
             `).join('');
-        } else {
-            eventsContainer.innerHTML = `<p style="color:#64748b; font-size:12px;">No scheduled events for this date.</p>`;
-        }
+        }} else {{
+            eventsContainer.innerHTML = `<p style="color:#64748b; font-size:12px;">No scheduled events in Google Sheets for this date.</p>`;
+        }}
 
         // Render Bills
         const billsContainer = document.getElementById('billsTab');
-        if (dayData.bills.length > 0) {
+        if (dayData.bills && dayData.bills.length > 0) {{
             billsContainer.innerHTML = dayData.bills.map(b => `
                 <div class="data-card bill">
-                    <div class="data-title">${b.title} — <span style="color:#f59e0b;">${b.amount}</span></div>
-                    <div class="data-sub">💳 ${b.due}</div>
+                    <div class="data-title">${{b.title}} — <span style="color:#f59e0b;">${{b.amount}}</span></div>
+                    <div class="data-sub">💳 ${{b.due}}</div>
                 </div>
             `).join('');
-        } else {
-            billsContainer.innerHTML = `<p style="color:#64748b; font-size:12px;">No bills due on this date.</p>`;
-        }
+        }} else {{
+            billsContainer.innerHTML = `<p style="color:#64748b; font-size:12px;">No bills due in Google Sheets for this date.</p>`;
+        }}
 
         // Render Notes
         const notesContainer = document.getElementById('notesTab');
-        notesContainer.innerHTML = `<p style="color:#94a3b8; font-size:13px;">${dayData.notes || 'No notes added for this date.'}</p>`;
-    }
+        notesContainer.innerHTML = `<p style="color:#94a3b8; font-size:13px;">${{dayData.notes || 'No notes found in Google Sheets for this date.'}}</p>`;
+    }}
 
-    function switchTab(tabId, btn) {
+    function switchTab(tabId, btn) {{
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         
         btn.classList.add('active');
         document.getElementById(tabId).classList.add('active');
-    }
+    }}
 
-    // Initialize Grid & Auto-select Today (August 12)
+    // Initialize Grid & Auto-select Today
     renderGrid();
-    setTimeout(() => {
-        const todayCell = document.getElementById(`cell-${TODAY.month}-${TODAY.day}`);
-        if (todayCell) {
+    setTimeout(() => {{
+        const todayCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
+        if (todayCell) {{
             selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-work', todayCell);
-        }
-    }, 50);
+        }}
+    }}, 50);
 </script>
 
 </body>
 </html>
 """
 
-# Render dynamically with enough height to eliminate internal scrollbars
-components.html(calendar_html, height=720, scrolling=False)
+# Render full screen height component
+components.html(calendar_html, height=1000, scrolling=False)
