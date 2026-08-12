@@ -683,8 +683,9 @@ elif current_tab == "Focus":
             st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No bills due today.</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-header' style='margin-top:20px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
-    week_cols = st.columns(7)
     
+    # Render Upcoming Week Cards and their respective vertical dropdowns underneath each column
+    week_cols = st.columns(7)
     for i in range(1, 8):
         future_dt = focus_date_val + datetime.timedelta(days=i)
         f_key = future_dt.strftime("%Y-%m-%d")
@@ -701,30 +702,20 @@ elif current_tab == "Focus":
                 <div style="font-size: 11px; color: {'#facc15' if bill_count > 0 else '#64748b'};">💸 {bill_count} bill{"" if bill_count == 1 else "s"}</div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Vertical drop-down expander directly under each respective day card
+            day_title = future_dt.strftime('%a, %b %d')
+            with st.expander(f"View {day_title}"):
+                if f_data["events"] or f_data["bills"]:
+                    for ev in f_data["events"]:
+                        time_suffix = f" (@ {ev['time']})" if ev["time"] else ""
+                        st.markdown(f"<div style='color:#38bdf8; font-size:11px; margin-bottom:3px;'>• <b>Event:</b> {ev['title']}{time_suffix}</div>", unsafe_allow_html=True)
+                    for b in f_data["bills"]:
+                        st.markdown(f"<div style='color:#facc15; font-size:11px; margin-bottom:3px;'>• <b>Bill:</b> {b['title']}</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div style='color:#64748b; font-size:11px;'>No events or bills.</div>", unsafe_allow_html=True)
 
-    # Individual Expanders for each day of the upcoming week (Fixed String Formatting)
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    for i in range(1, 8):
-        future_dt = focus_date_val + datetime.timedelta(days=i)
-        f_key = future_dt.strftime("%Y-%m-%d")
-        f_data = live_data.get(f_key, {"events": [], "bills": []})
-        day_title = future_dt.strftime('%A, %b %d')
-        
-        ev_count = len(f_data["events"])
-        bill_count = len(f_data["bills"])
-        expander_label = f"📅 {day_title} — {ev_count} event(s), {bill_count} bill(s)"
-        
-        with st.expander(expander_label):
-            if f_data["events"] or f_data["bills"]:
-                for ev in f_data["events"]:
-                    time_suffix = f" (@ {ev['time']})" if ev["time"] else ""
-                    st.markdown(f"<div style='color:#38bdf8; font-size:12px; margin-bottom:4px;'>• <b>Event:</b> {ev['title']}{time_suffix}</div>", unsafe_allow_html=True)
-                for b in f_data["bills"]:
-                    st.markdown(f"<div style='color:#facc15; font-size:12px; margin-bottom:4px;'>• <b>Bill:</b> {b['title']}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div style='color:#64748b; font-size:12px;'>No events or bills scheduled for this day.</div>", unsafe_allow_html=True)
-
-    # Redesigned Month Overview View
+    # Compact Grid View for Month Overview (Days 8 to 37)
     st.markdown("<div class='section-header' style='margin-top:25px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
     
     month_events_list = []
@@ -733,21 +724,29 @@ elif current_tab == "Focus":
         m_key = m_dt.strftime("%Y-%m-%d")
         m_data = live_data.get(m_key)
         if m_data and (m_data["events"] or m_data["bills"]):
-            titles = [e['title'] for e in m_data["events"]] + [b['title'] for b in m_data["bills"]]
             month_events_list.append({
-                "date_str": m_dt.strftime("%A, %b %d, %Y"),
-                "items": titles
+                "date_str": m_dt.strftime("%b %d (%a)"),
+                "events": [e['title'] for e in m_data["events"]],
+                "bills": [b['title'] for b in m_data["bills"]]
             })
 
     if month_events_list:
+        grid_html = """
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px;">
+        """
         for item in month_events_list:
-            items_html = "".join([f"<span style='background:#1e293b; color:#38bdf8; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; display:inline-block; margin:2px;'>{it}</span>" for it in item["items"]])
-            st.markdown(f"""
-            <div class="goal-card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px;">
-                <div style="font-weight: 700; color: #f8fafc; font-size: 13px; min-width: 160px;">{item["date_str"]}</div>
-                <div style="text-align: right; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;">{items_html}</div>
+            events_tags = "".join([f"<div style='background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-top:2px;'>📅 {ev}</div>" for ev in item["events"]])
+            bills_tags = "".join([f"<div style='background:rgba(250,204,21,0.15); color:#facc15; border:1px solid rgba(250,204,21,0.3); padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-top:2px;'>💸 {bi}</div>" for bi in item["bills"]])
+            
+            grid_html += f"""
+            <div style="background:#161a22; border:1px solid #222734; border-radius:8px; padding:8px 10px;">
+                <div style="font-weight:700; color:#cbd5e1; font-size:11px; border-bottom:1px solid #222734; padding-bottom:3px; margin-bottom:4px;">{item["date_str"]}</div>
+                {events_tags}
+                {bills_tags}
             </div>
-            """, unsafe_allow_html=True)
+            """
+        grid_html += "</div>"
+        st.markdown(grid_html, unsafe_allow_html=True)
     else:
         st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
 
