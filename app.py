@@ -225,7 +225,7 @@ def fetch_finances_data(finances_url):
         "assets": []
     }
 
-    # Pull Net Worth block directly from columns Q (index 16) & R (index 17)
+    # Pull Net Worth block from columns Q (index 16) & R (index 17)
     try:
         fin_data["kpis"]["savings"] = clean_num(df.iloc[3, 17])
         fin_data["kpis"]["credit"] = clean_num(df.iloc[4, 17])
@@ -280,12 +280,12 @@ def fetch_finances_data(finances_url):
                 fin_data["var_budgets"].append({"item": name, "weekly": f"${wk_val:,.2f}"})
         except: pass
 
-    # Goal configurations mapped cleanly to target table + Account Transfers section balances
+    # Goal configurations mapped cleanly to columns K to Q (indices 10 to 16)
     goal_specs = [
-        {"name": "Italy", "target": 7000.00, "end_date": "9-Sep-2026", "rate": 1037.50, "status": "IN PROGRESS", "bal_row": 27},
-        {"name": "New Zealand", "target": 2087.98, "end_date": "", "rate": 0.00, "status": "SAVED", "bal_row": 31}, # Savings row
-        {"name": "Adelaide", "target": 2600.00, "end_date": "30-Sep-2026", "rate": 650.00, "status": "WAITING", "bal_row": 28},
-        {"name": "Emergency Fund", "target": 9000.00, "end_date": "6-Jan-2027", "rate": 692.31, "status": "WAITING", "bal_row": 29}
+        {"name": "Italy", "target": 7000.00, "end_date": "9-Sep-2026", "rate": 1037.50, "status": "IN PROGRESS", "goal_row": 16},
+        {"name": "New Zealand", "target": 2087.98, "end_date": "", "rate": 0.00, "status": "SAVED", "goal_row": 20}, 
+        {"name": "Adelaide", "target": 2600.00, "end_date": "30-Sep-2026", "rate": 650.00, "status": "WAITING", "goal_row": 17},
+        {"name": "Emergency Fund", "target": 9000.00, "end_date": "6-Jan-2027", "rate": 692.31, "status": "WAITING", "goal_row": 18}
     ]
 
     for spec in goal_specs:
@@ -295,8 +295,8 @@ def fetch_finances_data(finances_url):
         rate_val = spec["rate"]
         override_status = spec["status"]
         
-        # Pull current balance directly from Column B (index 1) of the designated Account Transfers row
-        bal_val = clean_num(df.iloc[spec["bal_row"], 1])
+        # Pull current balance directly from Column Q (index 16) of the designated goal row
+        bal_val = clean_num(df.iloc[spec["goal_row"], 16])
 
         pct = int((bal_val / target_val * 100)) if target_val > 0 else 0
         if pct > 100: pct = 100
