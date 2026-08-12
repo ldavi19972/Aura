@@ -47,7 +47,7 @@ st.markdown("""
         gap: 6px !important;
     }
 
-    /* Tab Bar Styling */
+    /* Tab Bar Styling - High Contrast Unselected State */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: #11151c;
@@ -60,12 +60,12 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {
         height: 44px;
         border-radius: 8px;
-        color: #64748b !important;
+        color: #cbd5e1 !important; /* Brighter, high-contrast text for unselected state */
         font-weight: 600;
         font-size: 14px;
-        border: 1px solid transparent !important;
+        border: 1px solid #2a324b !important; /* Subtle boundary border */
         padding: 0 24px;
-        background: #161a22;
+        background: #1e2430 !important; /* Visible dark-slate card background */
         transition: all 0.2s ease-in-out;
     }
 
@@ -207,7 +207,6 @@ st.markdown("""
         transition: background-color 0.15s ease, color 0.15s ease;
     }
 
-    /* FIX: Remove white highlight on focus/hover/open state */
     .stExpander summary:hover,
     .stExpander summary:focus,
     .stExpander summary:active,
@@ -722,13 +721,14 @@ with tab_fin:
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+        # FIX: Explicit larger gap spacer below KPI boxes
+        st.markdown("<div style='margin-bottom: 24px;'></div>", unsafe_allow_html=True)
 
         # Main Grid
         col_goals, col_cash = st.columns([1.2, 1])
 
         with col_goals:
-            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:6px;'>🎯 Savings & Goal Tracker</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>🎯 Savings & Goal Tracker</h4>", unsafe_allow_html=True)
 
             for g in fin["goals"]:
                 st.markdown(f"""
@@ -748,7 +748,7 @@ with tab_fin:
                 """, unsafe_allow_html=True)
 
         with col_cash:
-            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:6px;'>📊 Cash Flow Summary</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>📊 Cash Flow Summary</h4>", unsafe_allow_html=True)
 
             # Income Card
             st.markdown(f"""
@@ -829,13 +829,13 @@ with tab_fin:
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
         # Secondary Grid
         b_col1, b_col2 = st.columns([1, 1])
 
         with b_col1:
-            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:6px;'>💳 Credit & Loan Repayments</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>💳 Credit & Loan Repayments</h4>", unsafe_allow_html=True)
             debt_rows = "".join([
                 f'''<div class="cf-row">
                         <div>
@@ -852,7 +852,7 @@ with tab_fin:
             st.markdown(f'<div class="cashflow-card">{debt_rows}</div>', unsafe_allow_html=True)
 
         with b_col2:
-            st.markdown(f"<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:6px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='font-size:15px; color:#cbd5e1; font-weight:700; margin-bottom:8px;'>🛋️ Physical Assets (${fin['kpis']['assets']:,.2f} Total)</h4>", unsafe_allow_html=True)
             asset_rows = "".join([
                 f'''<div class="cf-row">
                         <span style="color:#fff; font-weight:600;">{a["item"]}</span>
