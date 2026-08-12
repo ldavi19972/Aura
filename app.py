@@ -196,7 +196,7 @@ calendar_html = f"""
         font-weight: 700;
         text-align: center;
         padding: 4px 0;
-        width: 2.4%;
+        width: 2.3%;
     }}
 
     th.col-header-first {{
@@ -221,7 +221,7 @@ calendar_html = f"""
 
     .day-cell {{
         height: 26px;
-        width: 2.4%;
+        width: 2.3%;
         border-radius: 4px;
         text-align: center;
         font-size: 10px;
@@ -411,9 +411,9 @@ calendar_html = f"""
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     
-    // Day letter map starting on Jan 1, 2026 (Thursday)
-    const dayLetters = ["T", "F", "S", "S", "M", "T", "W"]; 
-    const TOTAL_GRID_COLS = 37; // Max columns needed across all months
+    // Day letter sequence starting on Tuesday
+    const dayLetters = ["T", "W", "T", "F", "S", "S", "M"]; 
+    const TOTAL_GRID_COLS = 39; // Expanded to accommodate the 2-column shift smoothly
 
     function getCssClassForCategory(category) {{
         switch(category) {{
@@ -429,7 +429,7 @@ calendar_html = f"""
         const grid = document.getElementById('calendarGrid');
         let html = '<thead><tr><th class="col-header-first">2026</th>';
         
-        // Render 37 column headers with repeating Day Letters (T, F, S, S, M, T, W...)
+        // Render headers starting at Tuesday (T, W, T, F, S, S, M...)
         for (let col = 0; col < TOTAL_GRID_COLS; col++) {{
             const letter = dayLetters[col % 7];
             html += `<th class="col-header">${{letter}}</th>`;
@@ -440,12 +440,11 @@ calendar_html = f"""
             html += `<tr><td class="month-label">${{mName}}</td>`;
             const totalDays = daysInMonths[mIdx];
             
-            // Calculate weekday offset for the 1st of each month relative to Jan 1 (Thursday)
             const firstOfMonthDate = new Date(YEAR, mIdx, 1);
-            // JavaScript getDay(): 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-            // Jan 1, 2026 is Thursday (4). Calculate column offset relative to Thursday:
             const jsDay = firstOfMonthDate.getDay(); 
-            const offset = (jsDay - 4 + 7) % 7; 
+            
+            // Calculate column offset relative to Tuesday (jsDay 2: Sun=0, Mon=1, Tue=2, Wed=3, Thu=4...)
+            const offset = (jsDay - 2 + 7) % 7; 
 
             let currentDay = 1;
 
