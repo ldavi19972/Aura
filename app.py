@@ -353,7 +353,7 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Management
+# 4. State Management & Query Parameter Bridge
 # -----------------------------------------------------------------------------
 today_default = datetime.date.today()
 
@@ -381,7 +381,7 @@ current_tab = st.session_state["active_tab"]
 # -----------------------------------------------------------------------------
 # 5. Render Custom Navigation Bar
 # -----------------------------------------------------------------------------
-focus_label = f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View"
+focus_label = f"🔍  Focus View: {focus_date_str}"
 
 col_nav1, col_nav2, col_nav3, col_spacer = st.columns([1.2, 1.6, 1.3, 4])
 
@@ -416,6 +416,9 @@ if current_tab == "Calendar":
     today_formatted = today_date.strftime("%A, %B %d, %Y")
     today_m_idx = today_date.month - 1
     today_d_num = today_date.day
+
+    # Pass the current session state focus date to JavaScript for initial pre-selection
+    selected_js_date_str = focus_date_str
 
     calendar_html = f"""
     <!DOCTYPE html>
@@ -489,7 +492,7 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date to preview details & update Focus View button</div>
+            <div class="click-hint">💡 Click any date to preview details & sync Focus View button</div>
         </div>
     </div>
 
@@ -610,7 +613,7 @@ if current_tab == "Calendar":
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
 
-            // Send selected date back to Streamlit container via query params bridge
+            // Push clicked date to Python via query parameter reload bridge
             try {{
                 const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
                 window.top.location.href = targetUrl;
@@ -628,31 +631,58 @@ if current_tab == "Calendar":
 
         renderGrid();
         setTimeout(() => {{
-            const currentSelectedKey = "{focus_date_str}";
-            const [cY, cM, cD] = currentSelectedKey.split("-").map(Number);
-            const targetCell = document.getElementById(`cell-${{cM - 1}}-${{cD}}`);
+            const activeKey = "{selected_js_date_str}";
+            const [aY, aM, aD] = activeKey.split("-").map(Number);
+            const targetCell = document.getElementById(`cell-${{aM - 1}}-${{aD}}`);
             if (targetCell) {{
-                selectDate(cM - 1, cD, months[cM - 1], 'Working', 'status-working', targetCell);
-            }} else {{
-                const todayCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
-                if (todayCell) selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', todayCell);
+                // Highlight without reloading on initial load
+                targetCell.classList.add('selected');
+                selectDateSilently(aM - 1, aD, months[aM - 1], targetCell);
             }}
         }}, 50);
+
+        function selectDateSilently(mIdx, day, monthName, element) {{
+            const dateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
+            const entry = sheetData[dateKey];
+            const statusName = entry ? entry.status : 'Working';
+            const statusClass = getCssClassForCategory(statusName);
+
+            document.getElementById('selectedDateTitle').innerText = `${{monthName}} ${{day}}, ${{YEAR}}`;
+            const badge = document.getElementById('selectedStatusBadge');
+            badge.innerText = statusName;
+            badge.className = `status-badge ${{statusClass}}`;
+
+            const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
+            const eventsTab = document.getElementById('eventsTab');
+            const eventsList = dayData.events || [];
+            eventsTab.innerHTML = eventsList.length > 0 
+                ? eventsList.map(e => `
+                    <div class="data-card">
+                        <div style="color:#fff; font-weight:600; font-size: 13px;">${{e.title}}</div>
+                        ${{e.time || e.location ? `<div class="card-meta">
+                            ${{e.time ? `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>` : ''}}
+                            ${{e.location ? `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>` : ''}}
+                        </div>` : ''}}
+                    </div>
+                `).join('')
+                : `<p style="color:#64748b;">No events recorded for this date.</p>`;
+
+            const billsTab = document.getElementById('billsTab');
+            const billsList = dayData.bills || [];
+            billsTab.innerHTML = billsList.length > 0 
+                ? billsList.map(b => `
+                    <div class="data-card bill-card">
+                        <div style="color:#fff; font-weight:600; font-size: 13px;">💸 ${{b.title}}</div>
+                    </div>
+                `).join('')
+                : `<p style="color:#64748b;">No bills due on this date.</p>`;
+        }}
     </script>
 
     </body>
     </html>
     """
     components.html(calendar_html, height=695, scrolling=False)
-
-    # Capture preview date selection from HTML calendar and instantly rerun
-    if "preview_date" in query_params:
-        try:
-            st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
-        except:
-            pass
-        st.query_params.clear()
-        st.rerun()
 
     # Native Streamlit Action Button safely rendered right below calendar component
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
