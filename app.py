@@ -42,45 +42,64 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* Tab Bar Styling - High-contrast white unselected & natural dark active state */
+    /* Streamlit Native Tab Bar Container */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #11151c;
-        padding: 6px 8px;
-        border-radius: 10px;
-        border: 1px solid #1e2638;
-        margin-bottom: 16px;
+        gap: 8px !important;
+        background-color: #11151c !important;
+        padding: 6px 8px !important;
+        border-radius: 10px !important;
+        border: 1px solid #222734 !important;
+        margin-bottom: 16px !important;
     }
 
-    /* Unselected Tabs */
+    /* Hide Streamlit Default Tab Border Line & Red Highlights */
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: transparent !important;
+    }
+
+    /* UNSELECTED TABS - Solid Dark Background with Forced Pure White Text */
     .stTabs [data-baseweb="tab"] {
-        height: 44px;
-        border-radius: 8px;
+        height: 44px !important;
+        border-radius: 8px !important;
         border: 1px solid #2a324b !important;
-        padding: 0 24px;
-        background: #181d27 !important;
-        transition: all 0.2s ease-in-out;
+        padding: 0 20px !important;
+        background-color: #161a22 !important;
+        transition: all 0.2s ease-in-out !important;
     }
 
-    /* Force pure white text on all child elements (p tags) in unselected state */
+    /* Aggressive inner targeting to override Streamlit's dim text opacity */
+    .stTabs [data-baseweb="tab"] *,
     .stTabs [data-baseweb="tab"] p,
-    .stTabs [data-baseweb="tab"] span {
+    .stTabs [data-baseweb="tab"] span,
+    .stTabs [data-baseweb="tab"] button {
         color: #ffffff !important;
         opacity: 1 !important;
         font-weight: 600 !important;
         font-size: 14px !important;
     }
 
-    /* Selected Tab - Natural Slate Dark with Accent Border */
-    .stTabs [aria-selected="true"] {
-        background-color: #1e293b !important;
-        border: 1px solid #38bdf8 !important;
-        box-shadow: 0 0 10px rgba(56, 189, 248, 0.2) !important;
+    /* Hover State for Unselected Tabs */
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #1c212c !important;
+        border-color: #3b4252 !important;
     }
 
+    /* SELECTED TAB - Charcoal Slate Dark + White Text + Subtle Emerald Bottom Accent */
+    .stTabs [aria-selected="true"] {
+        background-color: #222734 !important;
+        border: 1px solid #3b4252 !important;
+        border-bottom: 3px solid #22c55e !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .stTabs [aria-selected="true"] *,
     .stTabs [aria-selected="true"] p,
     .stTabs [aria-selected="true"] span {
-        color: #38bdf8 !important;
+        color: #ffffff !important;
         font-weight: 700 !important;
     }
 
@@ -195,7 +214,7 @@ st.markdown("""
         border-bottom: none;
     }
 
-    /* Streamlit Expander Dark Theme & Selection Overrides */
+    /* Streamlit Expander Dark Theme Overrides */
     .stExpander {
         background: #161a22 !important;
         border: 1px solid #222734 !important;
