@@ -3,7 +3,6 @@ import streamlit.components.v1 as components
 import pandas as pd
 import json
 import datetime
-import re
 
 # -----------------------------------------------------------------------------
 # 1. Google Sheet Endpoints
@@ -24,7 +23,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Global Reset & Container Adjustments */
+    /* Global Reset */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0e1117 !important;
         color: #f1f5f9 !important;
@@ -43,7 +42,7 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* High-Contrast Clear Tab Bar Styling */
+    /* Tab Bar Styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: #11151c;
@@ -65,11 +64,6 @@ st.markdown("""
         transition: all 0.2s ease-in-out;
     }
 
-    .stTabs [data-baseweb="tab"]:hover {
-        color: #cbd5e1 !important;
-        background: #1c222e;
-    }
-
     .stTabs [aria-selected="true"] {
         background-color: #0284c7 !important;
         color: #ffffff !important;
@@ -78,7 +72,7 @@ st.markdown("""
         box-shadow: 0 0 12px rgba(56, 189, 248, 0.35) !important;
     }
 
-    /* Financial Metrics Cards */
+    /* Metric Cards */
     .metric-card {
         background: #161a22;
         border: 1px solid #222734;
@@ -104,7 +98,7 @@ st.markdown("""
     .metric-negative { color: #fb7185; }
     .metric-neutral  { color: #38bdf8; }
 
-    /* Custom Goal Progress Cards */
+    /* Goal Cards */
     .goal-card {
         background: #161a22;
         border: 1px solid #222734;
@@ -158,20 +152,20 @@ st.markdown("""
         color: #94a3b8;
     }
 
-    /* Cashflow Custom Display */
+    /* Cashflow Containers & Seamless Dropdown Alignment */
     .cashflow-card {
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
         padding: 10px 14px;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
 
     .cf-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 5px 0;
+        padding: 4px 0;
         border-bottom: 1px solid #1c212c;
         font-size: 12px;
     }
@@ -180,17 +174,26 @@ st.markdown("""
         border-bottom: none;
     }
 
-    /* Compact Streamlit Expanders Styling */
+    /* Remove expander gap/padding for a cohesive block look */
     .stExpander {
         background: #161a22 !important;
         border: 1px solid #222734 !important;
         border-radius: 8px !important;
-        margin-bottom: 6px !important;
+        margin-top: 4px !important;
+        margin-bottom: 4px !important;
+    }
+    .stExpander details {
+        border: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     .stExpander summary {
         font-size: 12px !important;
-        padding: 6px 10px !important;
+        padding: 8px 12px !important;
         color: #e2e8f0 !important;
+    }
+    .stExpander [data-testid="stExpanderDetails"] {
+        padding: 4px 12px 8px 12px !important;
     }
     
     iframe {
@@ -201,7 +204,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 3. Helpers & Data Parsers
+# 3. Data Parsers
 # -----------------------------------------------------------------------------
 def clean_num(val):
     if pd.isna(val): return 0.0
@@ -284,7 +287,7 @@ def fetch_finances_data(finances_url):
         "assets": []
     }
 
-    # 1. Parse Top Net Worth KPIs (Rows 3-8, Cols 17-18 -> Q & R)
+    # 1. Parse Top Net Worth KPIs (Rows 3-6, Col 17 -> R)
     try:
         fin_data["kpis"]["savings"] = clean_num(df.iloc[3, 17])
         fin_data["kpis"]["credit"] = clean_num(df.iloc[4, 17])
@@ -292,7 +295,7 @@ def fetch_finances_data(finances_url):
         fin_data["kpis"]["net"] = clean_num(df.iloc[6, 17])
     except Exception: pass
 
-    # 2. Parse Income & Expenses Summary (Cols 2-6 -> C to G)
+    # 2. Parse Income & Expenses Summary (Cols D -> 3)
     try:
         fin_data["income"]["total_wk"] = clean_num(df.iloc[3, 3])
         fin_data["income"]["salary_wk"] = clean_num(df.iloc[4, 3])
@@ -308,7 +311,7 @@ def fetch_finances_data(finances_url):
         fin_data["net_flow"]["yr"] = clean_num(df.iloc[19, 6])
     except Exception: pass
 
-    # 3. Helper to determine native frequency for bills (Cols 3, 4, 5, 6 -> W, M, Q, Y)
+    # Detect bill native frequency
     def detect_native_freq(row_idx):
         try:
             wk_val = clean_num(df.iloc[row_idx, 3])
@@ -316,7 +319,6 @@ def fetch_finances_data(finances_url):
             qtr_val = clean_num(df.iloc[row_idx, 5])
             yr_val = clean_num(df.iloc[row_idx, 6])
 
-            # Check if quarterly or monthly are whole rounded values compared to calculated weekly
             if qtr_val > 0 and abs(qtr_val - round(qtr_val)) < 0.01:
                 return f"${qtr_val:,.2f}", "Quarterly"
             elif mo_val > 0 and abs(mo_val - round(mo_val)) < 0.01 and mo_val != round(wk_val * 4.33, 2):
@@ -329,8 +331,7 @@ def fetch_finances_data(finances_url):
             return f"${clean_num(df.iloc[row_idx, 3]):,.2f}", "Weekly"
 
     # Fixed Bills (Rows 8-13)
-    fixed_indices = [8, 9, 10, 11, 12, 13]
-    for r in fixed_indices:
+    for r in range(8, 14):
         try:
             name = str(df.iloc[r, 2]).strip()
             if name and name.lower() != 'nan':
@@ -340,8 +341,7 @@ def fetch_finances_data(finances_url):
         except: pass
 
     # Variable Budgets (Rows 15-17)
-    var_indices = [15, 16, 17]
-    for r in var_indices:
+    for r in range(15, 18):
         try:
             name = str(df.iloc[r, 2]).strip()
             if name and name.lower() != 'nan':
@@ -350,70 +350,67 @@ def fetch_finances_data(finances_url):
                 fin_data["var_budgets"].append({"item": name, "weekly": wk_impact, "native": native_amt, "freq": freq})
         except: pass
 
-    # 4. Parse Savings Goals (Merged from Balances B27:C31 and Goals K15:R20)
-    # Target Map from K15:R20
-    goals_meta = {}
-    for r in range(14, 20):
+    # 3. Dynamic Savings & Goals Parsing
+    # Index definitions based on sheet row mapping:
+    # Italy: Bal Row 27 (B28), Goal Row 15 (M16)
+    # New Zealand: Bal Row 28 (B29), Goal Row 16 (M17)
+    # Adelaide: Bal Row 29 (C30), Goal Row 17 (M18)
+    # Emergency Fund: Bal Row 30 (C31), Goal Row 18 (M19)
+    goals_mapping = [
+        {"name": "Italy", "bal_row": 27, "goal_row": 15},
+        {"name": "New Zealand", "bal_row": 28, "goal_row": 16},
+        {"name": "Adelaide", "bal_row": 29, "goal_row": 17},
+        {"name": "Emergency Fund", "bal_row": 30, "goal_row": 18}
+    ]
+
+    for g in goals_mapping:
         try:
-            g_name = str(df.iloc[r, 10]).strip() # Col K
-            if g_name and g_name.lower() not in ['nan', 'holidays', 'maintain saving rate']:
-                target = clean_num(df.iloc[r, 12])  # Col M Goal
-                end_date = str(df.iloc[r, 14]).replace('by', '').strip() # Col O
-                per_wk = clean_num(df.iloc[r, 16])   # Col Q
-                status_raw = str(df.iloc[r, 16]).strip()
-                goals_meta[g_name.lower()] = {
-                    "target": target,
-                    "end_date": end_date,
-                    "per_wk": per_wk,
-                    "status_raw": status_raw
-                }
-        except: pass
+            r_bal = g["bal_row"]
+            r_goal = g["goal_row"]
 
-    # Balances from B27:C31
-    for r in range(26, 31):
-        try:
-            g_name = str(df.iloc[r, 2]).strip() # Col C
-            if g_name and g_name.lower() not in ['nan', 'holidays']:
-                bal_val = clean_num(df.iloc[r, 1]) # Col B
-                col_c_text = str(df.iloc[r, 2]).strip()
-                
-                # Match metadata
-                meta = goals_meta.get(g_name.lower(), {"target": 0.0, "end_date": "", "per_wk": 0.0, "status_raw": ""})
-                target = meta["target"] if meta["target"] > 0 else (bal_val if "saved" in col_c_text.lower() else 0.0)
-                
-                pct = int((bal_val / target * 100)) if target > 0 else (100 if bal_val > 0 else 0)
-                if pct > 100: pct = 100
+            # Extracted Raw Data
+            bal_val = clean_num(df.iloc[r_bal, 1]) # Col B
+            status_c_col = str(df.iloc[r_bal, 2]).strip() # Col C text (e.g., WAITING)
+            
+            target_val = clean_num(df.iloc[r_goal, 12]) # Col M Goal
+            end_date = str(df.iloc[r_goal, 14]).replace('by', '').strip() # Col O
+            status_p_col = str(df.iloc[r_goal, 15]).strip() # Col P Status/Start Date
+            per_wk_val = clean_num(df.iloc[r_goal, 16]) # Col Q Rate
 
-                # Status and Badge
-                if pct == 100 or "saved" in col_c_text.lower() or "saved" in meta["status_raw"].lower():
-                    badge = "SAVED"
-                    badge_class = "badge-saved"
-                    color = "#4ade80"
-                    details = "Target Achieved • $0/wk needed"
-                elif "waiting" in col_c_text.lower() or "waiting" in meta["status_raw"].lower():
-                    badge = "WAITING"
-                    badge_class = "badge-waiting"
-                    color = "#facc15"
-                    details = f"Target: ${target:,.2f} • ${meta['per_wk']:,.2f}/wk"
-                else:
-                    badge = "IN PROGRESS"
-                    badge_class = "badge-progress"
-                    color = "#38bdf8"
-                    details = f"Target: {meta['end_date']} • Contrib: ${meta['per_wk']:,.2f}/wk"
+            # Determine Progress & Status Badges
+            pct = int((bal_val / target_val * 100)) if target_val > 0 else 0
+            if pct > 100: pct = 100
 
-                fin_data["goals"].append({
-                    "name": g_name,
-                    "current": bal_val,
-                    "target": target,
-                    "pct": pct,
-                    "badge": badge,
-                    "badge_class": badge_class,
-                    "color": color,
-                    "details": details
-                })
-        except: pass
+            if "WAITING" in status_c_col or "WAITING" in status_p_col:
+                badge = "WAITING"
+                badge_class = "badge-waiting"
+                color = "#facc15"
+                details = f"Target: {end_date} • Contrib: ${per_wk_val:,.2f}/wk" if end_date != 'nan' else f"Contrib: ${per_wk_val:,.2f}/wk"
+            elif pct >= 100 or "SAVED" in status_c_col:
+                badge = "SAVED"
+                badge_class = "badge-saved"
+                color = "#4ade80"
+                details = "Target Achieved • $0/wk needed"
+            else:
+                badge = "IN PROGRESS"
+                badge_class = "badge-progress"
+                color = "#38bdf8"
+                details = f"Target: {end_date} • Contrib: ${per_wk_val:,.2f}/wk" if end_date != 'nan' else f"Contrib: ${per_wk_val:,.2f}/wk"
 
-    # 5. Parse Debts (Lines of Credit C22:F25)
+            fin_data["goals"].append({
+                "name": g["name"],
+                "current": bal_val,
+                "target": target_val,
+                "pct": pct,
+                "badge": badge,
+                "badge_class": badge_class,
+                "color": color,
+                "details": details
+            })
+        except Exception as e:
+            pass
+
+    # 4. Debts Parsing (Rows 22-23)
     for r in [22, 23]:
         try:
             d_name = str(df.iloc[r, 2]).strip()
@@ -427,8 +424,8 @@ def fetch_finances_data(finances_url):
                 })
         except: pass
 
-    # 6. Parse Physical Assets (Cols K:O, Rows 3-10)
-    for r in range(3, 10):
+    # 5. Physical Assets Parsing (Cols K:O, Rows 3-8)
+    for r in range(3, 9):
         try:
             a_name = str(df.iloc[r, 10]).strip()
             if a_name and a_name.lower() != 'nan':
@@ -442,12 +439,12 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. Streamlit Main Tabs Layout
+# 4. Streamlit Layout
 # -----------------------------------------------------------------------------
 tab_cal, tab_fin = st.tabs(["📅  Calendar & Schedule", "💰  Finances & Net Worth"])
 
 # =============================================================================
-# TAB 1: CALENDAR INTERFACE
+# TAB 1: CALENDAR
 # =============================================================================
 with tab_cal:
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
@@ -654,13 +651,13 @@ with tab_cal:
 
 
 # =============================================================================
-# TAB 2: FINANCIAL DASHBOARD (DYNAMICALLY PULLED)
+# TAB 2: FINANCIAL DASHBOARD
 # =============================================================================
 with tab_fin:
     fin = fetch_finances_data(FINANCES_URL)
 
     if fin:
-        # Top KPI Bar
+        # KPI Bar
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             st.markdown(f"""
@@ -693,7 +690,7 @@ with tab_fin:
 
         st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
-        # Main Grid (Savings Goals & Cashflow)
+        # Main Grid
         col_goals, col_cash = st.columns([1.2, 1])
 
         with col_goals:
@@ -725,11 +722,11 @@ with tab_fin:
                     <span>Total Weekly Income</span>
                     <span>+${fin['income']['total_wk']:,.2f} / wk</span>
                 </div>
-                <div class="cf-row cf-sub">
+                <div class="cf-row">
                     <span>↳ Salary</span>
                     <span>${fin['income']['salary_wk']:,.2f} / wk</span>
                 </div>
-                <div class="cf-row cf-sub">
+                <div class="cf-row">
                     <span>↳ Transfers</span>
                     <span>${fin['income']['transfers_wk']:,.2f} / wk</span>
                 </div>
@@ -737,7 +734,7 @@ with tab_fin:
             """, unsafe_allow_html=True)
 
             st.markdown(f"""
-            <div class="cashflow-card" style="margin-bottom:4px;">
+            <div class="cashflow-card" style="margin-bottom:2px;">
                 <div class="cf-row" style="font-weight:700; color:#fb7185;">
                     <span>Total Weekly Expenses</span>
                     <span>-${fin['expenses']['total_wk']:,.2f} / wk</span>
@@ -745,11 +742,11 @@ with tab_fin:
             </div>
             """, unsafe_allow_html=True)
 
-            # Fixed Bills Expander
+            # Dropdowns
             with st.expander(f"↳ Fixed Bills Breakdown — ${fin['expenses']['fixed_wk']:,.2f} / wk"):
                 for b in fin["fixed_bills"]:
                     st.markdown(f"""
-                    <div class="cf-row" style="padding: 3px 0;">
+                    <div class="cf-row" style="padding: 2px 0;">
                         <span style="color:#cbd5e1; font-weight:600;">{b['item']}</span>
                         <span style="color:#94a3b8; font-size:11px;">
                             Impact: <b style="color:#fb7185;">{b['weekly']}/wk</b> &nbsp;|&nbsp; 
@@ -758,11 +755,10 @@ with tab_fin:
                     </div>
                     """, unsafe_allow_html=True)
 
-            # Variable Budgets Expander
             with st.expander(f"↳ Variable Budgets Breakdown — ${fin['expenses']['variable_wk']:,.2f} / wk"):
                 for v in fin["var_budgets"]:
                     st.markdown(f"""
-                    <div class="cf-row" style="padding: 3px 0;">
+                    <div class="cf-row" style="padding: 2px 0;">
                         <span style="color:#cbd5e1; font-weight:600;">{v['item']}</span>
                         <span style="color:#94a3b8; font-size:11px;">
                             Impact: <b style="color:#fb7185;">{v['weekly']}/wk</b> &nbsp;|&nbsp; 
@@ -771,10 +767,9 @@ with tab_fin:
                     </div>
                     """, unsafe_allow_html=True)
 
-            # Holiday Allocation Expander
             with st.expander(f"↳ Holiday Allocation — ${fin['expenses']['holiday_wk']:,.2f} / wk"):
                 st.markdown(f"""
-                <div class="cf-row" style="padding: 3px 0;">
+                <div class="cf-row" style="padding: 2px 0;">
                     <span style="color:#cbd5e1; font-weight:600;">Holidays Allocation</span>
                     <span style="color:#94a3b8; font-size:11px;">
                         Impact: <b style="color:#fb7185;">${fin['expenses']['holiday_wk']:,.2f}/wk</b> &nbsp;|&nbsp; 
@@ -784,7 +779,7 @@ with tab_fin:
                 """, unsafe_allow_html=True)
 
             st.markdown(f"""
-            <div class="cashflow-card" style="border-left: 3px solid #38bdf8; margin-top:8px;">
+            <div class="cashflow-card" style="border-left: 3px solid #38bdf8; margin-top:6px;">
                 <div class="cf-row" style="font-weight:700; color:#38bdf8; font-size:13px;">
                     <span>Net Savings Flow</span>
                     <span>+${fin['net_flow']['wk']:,.2f} / wk</span>
@@ -797,7 +792,7 @@ with tab_fin:
 
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
-        # Secondary Grid (Debt & Physical Assets)
+        # Secondary Grid
         b_col1, b_col2 = st.columns([1, 1])
 
         with b_col1:
