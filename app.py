@@ -355,25 +355,13 @@ def fetch_finances_data(finances_url):
 # -----------------------------------------------------------------------------
 # 4. State Management
 # -----------------------------------------------------------------------------
-today_default = datetime.date.today()
-
-if "focus_date" not in st.session_state:
-    st.session_state["focus_date"] = today_default
-
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
-if "preview_date" in query_params:
-    try:
-        st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
-    except:
-        pass
 
-focus_date_val = st.session_state["focus_date"]
-focus_date_str = focus_date_val.strftime("%Y-%m-%d") if isinstance(focus_date_val, datetime.date) else str(focus_date_val)
 current_tab = st.session_state["active_tab"]
 
 # -----------------------------------------------------------------------------
@@ -412,8 +400,6 @@ if current_tab == "Calendar":
     today_formatted = today_date.strftime("%A, %B %d, %Y")
     today_m_idx = today_date.month - 1
     today_d_num = today_date.day
-
-    selected_js_date_str = focus_date_str
 
     calendar_html = f"""
     <!DOCTYPE html>
@@ -617,13 +603,12 @@ if current_tab == "Calendar":
         }}
 
         renderGrid();
+        // Default preview to Today on load
         setTimeout(() => {{
-            const activeKey = "{selected_js_date_str}";
-            const [aY, aM, aD] = activeKey.split("-").map(Number);
-            const targetCell = document.getElementById(`cell-${{aM - 1}}-${{aD}}`);
+            const targetCell = document.getElementById(`cell-${{TODAY.month}}-${{TODAY.day}}`);
             if (targetCell) {{
                 targetCell.classList.add('selected');
-                selectDate(aM - 1, aD, months[aM - 1], targetCell.className.includes('holiday') ? 'Holiday' : 'Working', 'status-working', targetCell);
+                selectDate(TODAY.month, TODAY.day, months[TODAY.month], 'Working', 'status-working', targetCell);
             }}
         }}, 50);
     </script>
@@ -633,15 +618,6 @@ if current_tab == "Calendar":
     """
     components.html(calendar_html, height=695, scrolling=False)
 
-    # Native Streamlit Action Button
-    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-    c_btn1, c_btn2, c_btn3 = st.columns([2, 3, 2])
-    with c_btn2:
-        btn_date_str = st.session_state["focus_date"].strftime("%B %d, %Y") if isinstance(st.session_state["focus_date"], datetime.date) else focus_date_str
-        if st.button(f"🚀 Open Focus View for {btn_date_str}", use_container_width=True, type="primary"):
-            st.session_state["active_tab"] = "Focus"
-            st.rerun()
-
 
 # =============================================================================
 # TAB 2: FOCUS VIEW
@@ -649,7 +625,10 @@ if current_tab == "Calendar":
 elif current_tab == "Focus":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
-    sel_formatted = st.session_state["focus_date"].strftime("%A, %B %d, %Y") if isinstance(st.session_state["focus_date"], datetime.date) else focus_date_str
+    # Focus View automatically works off today's date
+    focus_date_val = datetime.date.today()
+    focus_date_str = focus_date_val.strftime("%Y-%m-%d")
+    sel_formatted = focus_date_val.strftime("%A, %B %d, %Y")
 
     st.markdown(f"<div class='section-header' style='margin-top:2px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
     
@@ -684,9 +663,8 @@ elif current_tab == "Focus":
     st.markdown("<div class='section-header' style='margin-top:20px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
     week_cols = st.columns(7)
     
-    f_base_date = st.session_state["focus_date"] if isinstance(st.session_state["focus_date"], datetime.date) else datetime.date.today()
     for i in range(1, 8):
-        future_dt = f_base_date + datetime.timedelta(days=i)
+        future_dt = focus_date_val + datetime.timedelta(days=i)
         f_key = future_dt.strftime("%Y-%m-%d")
         f_data = live_data.get(f_key, {"events": [], "bills": []})
         f_label = future_dt.strftime("%a<br>%b %d")
@@ -704,7 +682,7 @@ elif current_tab == "Focus":
 
     with st.expander("🔍 View Detailed Schedule for Next 7 Days"):
         for i in range(1, 8):
-            future_dt = f_base_date + datetime.timedelta(days=i)
+            future_dt = focus_date_val + datetime.timedelta(days=i)
             f_key = future_dt.strftime("%Y-%m-%d")
             f_data = live_data.get(f_key, {"events": [], "bills": []})
             if f_data["events"] or f_data["bills"]:
@@ -718,7 +696,7 @@ elif current_tab == "Focus":
     
     month_events_summary = []
     for i in range(8, 38):
-        m_dt = f_base_date + datetime.timedelta(days=i)
+        m_dt = focus_date_val + datetime.timedelta(days=i)
         m_key = m_dt.strftime("%Y-%m-%d")
         m_data = live_data.get(m_key)
         if m_data and (m_data["events"] or m_data["bills"]):
