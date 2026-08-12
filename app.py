@@ -22,19 +22,23 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Force full width and disable horizontal page scrolling */
+    /* Force full height, centered alignment, and eliminate scrollbars */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0e1117 !important;
         margin: 0 !important;
         padding: 0 !important;
         width: 100vw !important;
-        overflow-x: hidden !important;
+        height: 100vh !important;
+        overflow: hidden !important;
     }
 
     .main .block-container {
-        padding: 0.5rem 1rem !important;
+        padding: 0.25rem 1rem !important;
         max-width: 100% !important;
         margin: 0 auto !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
 
     header, footer, #MainMenu {
@@ -168,44 +172,49 @@ calendar_html = f"""
         background-color: #0e1117;
         color: #f1f5f9;
         width: 100%;
-        overflow-x: hidden;
-        padding: 10px 0;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 0 10px;
     }}
 
-    /* Compact header bar ending right after the date */
     .top-bar {{
         display: inline-flex;
         align-items: center;
+        align-self: flex-start;
         background: #161a22;
         border: 1px solid #222734;
-        border-radius: 10px;
-        padding: 10px 18px;
-        margin-bottom: 14px;
+        border-radius: 8px;
+        padding: 8px 14px;
+        margin-bottom: 8px;
     }}
 
     .today-badge {{
         background: rgba(56, 189, 248, 0.15);
         color: #38bdf8;
         border: 1px solid rgba(56, 189, 248, 0.4);
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 16px;
+        font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
     }}
 
     .today-date-text {{
-        font-size: 18px;
+        font-size: 15px;
         font-weight: 700;
         color: #f8fafc;
-        margin-left: 10px;
+        margin-left: 8px;
     }}
 
     .calendar-container {{
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
-        padding: 16px;
+        padding: 10px 14px;
         width: 100%;
         margin: 0 auto;
     }}
@@ -214,31 +223,31 @@ calendar_html = f"""
         width: 100%;
         table-layout: fixed;
         border-collapse: separate;
-        border-spacing: 3px;
+        border-spacing: 2px;
     }}
 
     th.col-header {{
         color: #94a3b8;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
         text-align: center;
-        padding: 6px 0;
+        padding: 2px 0;
         width: 2.4%;
     }}
 
     th.col-header-first {{
         width: 8%;
         text-align: left;
-        padding-left: 6px;
+        padding-left: 4px;
         color: #cbd5e1;
-        font-size: 14px;
+        font-size: 12px;
     }}
 
     td.month-label {{
         color: #94a3b8;
-        font-size: 13px;
+        font-size: 11px;
         font-weight: 600;
-        padding: 4px 6px;
+        padding: 2px 4px;
         white-space: nowrap;
         text-align: left;
         width: 8%;
@@ -246,13 +255,12 @@ calendar_html = f"""
         text-overflow: ellipsis;
     }}
 
-    /* Scaled up grid cells for larger presentation */
     .day-cell {{
-        height: 34px;
+        height: 28px;
         width: 2.4%;
-        border-radius: 5px;
+        border-radius: 4px;
         text-align: center;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.1s ease;
@@ -263,13 +271,13 @@ calendar_html = f"""
     }}
 
     .day-cell:hover {{
-        transform: scale(1.15);
+        transform: scale(1.12);
         border-color: #ffffff99 !important;
         z-index: 10;
     }}
 
     .day-cell.is-today {{
-        box-shadow: 0 0 0 2px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.6) !important;
+        box-shadow: 0 0 0 2px #38bdf8, 0 0 8px rgba(56, 189, 248, 0.6) !important;
         border-color: #38bdf8 !important;
     }}
 
@@ -278,7 +286,7 @@ calendar_html = f"""
         outline-offset: 1px;
     }}
 
-    /* Color Themes matched to Category */
+    /* Category Status Colors */
     .status-empty {{ background-color: transparent; border: none; cursor: default; }}
     .status-working {{ background-color: #133a20; color: #4ade80; border-color: #16522c; }}
     .status-public-holiday {{ background-color: #1e3a8a; color: #60a5fa; border-color: #1d4ed8; }}
@@ -288,71 +296,72 @@ calendar_html = f"""
 
     .legend-bar {{
         display: flex;
-        gap: 12px;
-        margin-top: 14px;
+        gap: 10px;
+        margin-top: 8px;
         flex-wrap: wrap;
     }}
 
     .legend-item {{
         display: flex;
         align-items: center;
-        gap: 6px;
-        font-size: 11px;
+        gap: 5px;
+        font-size: 10px;
         color: #94a3b8;
         background: #1a1e27;
-        padding: 5px 10px;
-        border-radius: 5px;
+        padding: 3px 8px;
+        border-radius: 4px;
         border: 1px solid #28303f;
     }}
 
     .legend-dot {{
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         border-radius: 2px;
     }}
 
     .detail-panel {{
-        margin-top: 16px;
+        margin-top: 10px;
         background: #161a22;
         border: 1px solid #222734;
         border-radius: 10px;
-        padding: 20px;
+        padding: 12px 16px;
+        width: 100%;
     }}
 
     .panel-header {{
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 14px;
+        margin-bottom: 8px;
     }}
 
     .panel-title {{
-        font-size: 18px;
+        font-size: 15px;
         font-weight: 700;
         color: #f8fafc;
     }}
 
     .status-badge {{
-        font-size: 11px;
-        padding: 4px 10px;
-        border-radius: 12px;
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 10px;
         font-weight: 600;
     }}
 
     .tab-bar {{
         display: flex;
-        gap: 12px;
+        gap: 8px;
         border-bottom: 1px solid #222734;
-        margin-bottom: 14px;
+        margin-bottom: 10px;
     }}
 
     .tab-btn {{
         background: none;
         border: none;
         color: #64748b;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
-        padding: 8px 14px;
+        padding: 4px 10px;
         cursor: pointer;
         border-bottom: 2px solid transparent;
         transition: color 0.15s ease;
@@ -366,7 +375,7 @@ calendar_html = f"""
     .tab-content {{
         display: none;
         color: #94a3b8;
-        font-size: 13px;
+        font-size: 12px;
     }}
 
     .tab-content.active {{
@@ -375,10 +384,10 @@ calendar_html = f"""
 
     .data-card {{
         background: #1c212c;
-        border-left: 4px solid #38bdf8;
-        padding: 14px 18px;
-        border-radius: 8px;
-        margin-bottom: 10px;
+        border-left: 3px solid #38bdf8;
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 6px;
     }}
 
     .bill-card {{
@@ -388,15 +397,15 @@ calendar_html = f"""
     .card-meta {{
         display: flex;
         align-items: center;
-        gap: 16px;
-        margin-top: 8px;
-        font-size: 12px;
+        gap: 12px;
+        margin-top: 4px;
+        font-size: 11px;
     }}
 
     .meta-item {{
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 4px;
     }}
 </style>
 </head>
@@ -535,7 +544,7 @@ calendar_html = f"""
                 
                 return `
                     <div class="data-card">
-                        <div style="color:#fff; font-weight:600; font-size: 15px;">${{e.title}}</div>
+                        <div style="color:#fff; font-weight:600; font-size: 14px;">${{e.title}}</div>
                         ${{metaHtml ? `<div class="card-meta">${{metaHtml}}</div>` : ''}}
                     </div>
                 `;
@@ -548,7 +557,7 @@ calendar_html = f"""
         billsTab.innerHTML = billsList.length > 0 
             ? billsList.map(b => `
                 <div class="data-card bill-card">
-                    <div style="color:#fff; font-weight:600; font-size: 15px;">💸 ${{b.title}}</div>
+                    <div style="color:#fff; font-weight:600; font-size: 14px;">💸 ${{b.title}}</div>
                 </div>
             `).join('')
             : `<p style="color:#64748b;">No bills due on this date.</p>`;
@@ -575,4 +584,4 @@ calendar_html = f"""
 </html>
 """
 
-components.html(calendar_html, height=800, scrolling=False)
+components.html(calendar_html, height=720, scrolling=False)
