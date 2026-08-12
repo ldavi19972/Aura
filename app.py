@@ -363,7 +363,6 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-# We use Streamlit query parameters cleanly and safely for date selection bridge
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
@@ -488,7 +487,7 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date in your calendar to instantly update Focus View</div>
+            <div class="click-hint">💡 Click any date in your calendar to preview details below</div>
         </div>
     </div>
 
@@ -608,13 +607,6 @@ if current_tab == "Calendar":
                     </div>
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
-
-            // Safely update app via URL search params without opening new tabs or windows
-            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + "?preview_date=" + dateKey;
-            window.history.replaceState({{}}, '', newUrl);
-            
-            // Trigger Streamlit reload via fetch to sync session state cleanly
-            fetch(newUrl).catch(() => {{}});
         }}
 
         function switchTab(tabId, btn) {{
@@ -631,46 +623,9 @@ if current_tab == "Calendar":
             const targetCell = document.getElementById(`cell-${{aM - 1}}-${{aD}}`);
             if (targetCell) {{
                 targetCell.classList.add('selected');
-                selectDateSilently(aM - 1, aD, months[aM - 1], targetCell);
+                selectDate(aM - 1, aD, months[aM - 1], targetCell.className.includes('holiday') ? 'Holiday' : 'Working', 'status-working', targetCell);
             }}
         }}, 50);
-
-        function selectDateSilently(mIdx, day, monthName, element) {{
-            const dateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
-            const entry = sheetData[dateKey];
-            const statusName = entry ? entry.status : 'Working';
-            const statusClass = getCssClassForCategory(statusName);
-
-            document.getElementById('selectedDateTitle').innerText = `${{monthName}} ${{day}}, ${{YEAR}}`;
-            const badge = document.getElementById('selectedStatusBadge');
-            badge.innerText = statusName;
-            badge.className = `status-badge ${{statusClass}}`;
-
-            const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
-            const eventsTab = document.getElementById('eventsTab');
-            const eventsList = dayData.events || [];
-            eventsTab.innerHTML = eventsList.length > 0 
-                ? eventsList.map(e => `
-                    <div class="data-card">
-                        <div style="color:#fff; font-weight:600; font-size: 13px;">${{e.title}}</div>
-                        ${{e.time || e.location ? `<div class="card-meta">
-                            ${{e.time ? `<span class="meta-item" style="color:#38bdf8;">⏰ ${{e.time}}</span>` : ''}}
-                            ${{e.location ? `<span class="meta-item" style="color:#94a3b8;">📍 ${{e.location}}</span>` : ''}}
-                        </div>` : ''}}
-                    </div>
-                `).join('')
-                : `<p style="color:#64748b;">No events recorded for this date.</p>`;
-
-            const billsTab = document.getElementById('billsTab');
-            const billsList = dayData.bills || [];
-            billsTab.innerHTML = billsList.length > 0 
-                ? billsList.map(b => `
-                    <div class="data-card bill-card">
-                        <div style="color:#fff; font-weight:600; font-size: 13px;">💸 ${{b.title}}</div>
-                    </div>
-                `).join('')
-                : `<p style="color:#64748b;">No bills due on this date.</p>`;
-        }}
     </script>
 
     </body>
@@ -678,7 +633,7 @@ if current_tab == "Calendar":
     """
     components.html(calendar_html, height=695, scrolling=False)
 
-    # Native Streamlit Action Button safely rendered right below calendar component
+    # Native Streamlit Action Button
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
     c_btn1, c_btn2, c_btn3 = st.columns([2, 3, 2])
     with c_btn2:
