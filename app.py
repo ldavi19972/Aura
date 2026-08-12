@@ -363,7 +363,7 @@ if "focus_date" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Calendar"
 
-# Handle communication from the calendar component via query params
+# Handle communication from URL parameters
 query_params = st.query_params
 if "tab" in query_params:
     st.session_state["active_tab"] = query_params["tab"]
@@ -406,7 +406,7 @@ with col_nav3:
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
 # =============================================================================
-# TAB 1: CALENDAR (Original Gorgeous HTML Grid with Preview Action Button)
+# TAB 1: CALENDAR
 # =============================================================================
 if current_tab == "Calendar":
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
@@ -469,6 +469,23 @@ if current_tab == "Calendar":
         .card-meta {{ display: flex; align-items: center; gap: 12px; margin-top: 2px; font-size: 11px; }}
         .meta-item {{ display: flex; align-items: center; gap: 4px; }}
         .click-hint {{ font-size: 10px; color: #38bdf8; margin-top: 6px; text-align: right; }}
+        
+        /* Sleek accessible button inside panel header */
+        .focus-jump-btn {{
+            background: #38bdf8;
+            color: #0e1117;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }}
+        .focus-jump-btn:hover {{
+            background: #7dd3fc;
+            transform: scale(1.03);
+        }}
     </style>
     </head>
     <body>
@@ -489,14 +506,17 @@ if current_tab == "Calendar":
                 <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Work Trip</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Today</div>
             </div>
-            <div class="click-hint">💡 Click any date to preview details below</div>
+            <div class="click-hint">💡 Click any date to preview details & access Focus View</div>
         </div>
     </div>
 
     <div class="detail-panel">
         <div class="panel-header">
-            <div class="panel-title" id="selectedDateTitle">Select a date</div>
-            <div class="status-badge status-working" id="selectedStatusBadge">Working</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="panel-title" id="selectedDateTitle">Select a date</div>
+                <div class="status-badge status-working" id="selectedStatusBadge">Working</div>
+            </div>
+            <button class="focus-jump-btn" onclick="jumpToFocus()">🚀 Open Focus View</button>
         </div>
 
         <div class="tab-bar">
@@ -512,6 +532,7 @@ if current_tab == "Calendar":
         const YEAR = 2026;
         const TODAY = {{ month: {today_m_idx}, day: {today_d_num} }};
         const sheetData = {json_data};
+        let activeDateKey = `${{YEAR}}-${{String(TODAY.month + 1).padStart(2, '0')}}-${{String(TODAY.day).padStart(2, '0')}}`;
 
         const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -578,13 +599,14 @@ if current_tab == "Calendar":
             document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
             if (element) element.classList.add('selected');
 
+            activeDateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
+
             document.getElementById('selectedDateTitle').innerText = `${{monthName}} ${{day}}, ${{YEAR}}`;
             const badge = document.getElementById('selectedStatusBadge');
             badge.innerText = statusName;
             badge.className = `status-badge ${{statusClass}}`;
 
-            const dateKey = `${{YEAR}}-${{String(mIdx + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
-            const dayData = sheetData[dateKey] || {{ events: [], bills: [] }};
+            const dayData = sheetData[activeDateKey] || {{ events: [], bills: [] }};
             
             const eventsTab = document.getElementById('eventsTab');
             const eventsList = dayData.events || [];
@@ -609,12 +631,15 @@ if current_tab == "Calendar":
                     </div>
                 `).join('')
                 : `<p style="color:#64748b;">No bills due on this date.</p>`;
+        }}
 
-            // Send selected date back to Python session state bridge via query params update
+        function jumpToFocus() {{
             try {{
-                const targetUrl = window.top.location.origin + window.top.location.pathname + '?preview_date=' + dateKey;
-                window.top.history.replaceState(null, '', targetUrl);
-            }} catch(e) {{}}
+                const targetUrl = window.top.location.origin + window.top.location.pathname + '?focus_date=' + activeDateKey + '&tab=Focus';
+                window.top.location.href = targetUrl;
+            }} catch(e) {{
+                window.parent.location.href = '?focus_date=' + activeDateKey + '&tab=Focus';
+            }}
         }}
 
         function switchTab(tabId, btn) {{
@@ -635,23 +660,6 @@ if current_tab == "Calendar":
     </html>
     """
     components.html(calendar_html, height=695, scrolling=False)
-
-    # Capture preview date if clicked in HTML
-    if "preview_date" in query_params:
-        try:
-            st.session_state["focus_date"] = datetime.datetime.strptime(query_params["preview_date"], "%Y-%m-%d").date()
-        except:
-            pass
-
-    # Sleek Python Action Button below calendar preview
-    preview_date_str = st.session_state["focus_date"].strftime("%Y-%m-%d") if isinstance(st.session_state["focus_date"], datetime.date) else str(st.session_state["focus_date"])
-    
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    col_act1, col_act2 = st.columns([3, 1])
-    with col_act2:
-        if st.button(f"🚀 Open Focus View for {preview_date_str}", use_container_width=True, type="primary"):
-            st.session_state["active_tab"] = "Focus"
-            st.rerun()
 
 
 # =============================================================================
