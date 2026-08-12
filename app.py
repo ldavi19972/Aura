@@ -41,40 +41,31 @@ st.markdown("""
         height: 0px !important;
     }
 
-    .stTabs [data-baseweb="tab-list"] {
+    /* Custom Radio Navigation Styling to mimic Tabs */
+    div[data-testid="stHorizontalBlock"] {
         gap: 8px !important;
+    }
+    
+    .stRadio > div {
         background-color: #11151c !important;
         padding: 6px 8px !important;
         border-radius: 10px !important;
         border: 1px solid #222734 !important;
         margin-bottom: 16px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8px !important;
     }
 
-    .stTabs [data-baseweb="tab-border"] { display: none !important; }
-    .stTabs [data-baseweb="tab-highlight"] { display: none !important; height: 0px !important; background-color: transparent !important; }
-
-    .stTabs [data-baseweb="tab"] {
-        height: 44px !important;
-        border-radius: 8px !important;
-        border: 1px solid #2a324b !important;
-        padding: 0 20px !important;
+    .stRadio label {
         background-color: #161a22 !important;
-        transition: all 0.2s ease-in-out !important;
-    }
-
-    .stTabs [data-baseweb="tab"] *, .stTabs [data-baseweb="tab"] p, .stTabs [data-baseweb="tab"] span {
+        border: 1px solid #2a324b !important;
+        border-radius: 8px !important;
+        padding: 8px 20px !important;
         color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        opacity: 1 !important;
         font-weight: 700 !important;
         font-size: 14px !important;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: #222734 !important;
-        border: 1px solid #3b4252 !important;
-        border-bottom: 3px solid #22c55e !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        cursor: pointer !important;
     }
 
     .section-header {
@@ -385,41 +376,47 @@ def fetch_finances_data(finances_url):
     return fin_data
 
 # -----------------------------------------------------------------------------
-# 4. State Initialization
+# 4. State Initialization & Routing
 # -----------------------------------------------------------------------------
-if "focus_date" not in st.session_state:
-    st.session_state["focus_date"] = ""
+today_default = datetime.date.today().strftime("%Y-%m-%d")
 
-if "active_tab_idx" not in st.session_state:
-    st.session_state["active_tab_idx"] = 0
+if "focus_date" not in st.session_state or not st.session_state["focus_date"]:
+    st.session_state["focus_date"] = today_default
 
-# Check incoming query params for double-click selection from iframe component
+if "nav_tab" not in st.session_state:
+    st.session_state["nav_tab"] = "Calendar & Schedule"
+
+# Handle incoming query parameters from double-clicks inside the calendar iframe
 query_date = st.query_params.get("focus_date", "")
-if query_date and query_date != st.session_state["focus_date"]:
+if query_date:
     st.session_state["focus_date"] = query_date
-    st.session_state["active_tab_idx"] = 1  # Switch directly to Focus View tab
+    st.session_state["nav_tab"] = "Focus View"
+    st.query_params.clear()
+    st.rerun()
 
 focus_date_str = st.session_state["focus_date"]
 
 # -----------------------------------------------------------------------------
-# 5. Streamlit Layout & Tabs
+# 5. Top Tab Navigation (Radio-driven for State Preservation)
 # -----------------------------------------------------------------------------
 tab_labels = [
     "📅  Calendar & Schedule",
-    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View (Double-click date)",
+    f"🔍  Focus View: {focus_date_str}" if focus_date_str else "🔍  Focus View",
     "💰  Finances & Net Worth"
 ]
 
-def on_tab_change():
-    # Sync selected tab index if user clicks tabs manually
-    pass
-
-tab_cal, tab_focus, tab_fin = st.tabs(tab_labels)
+selected_tab = st.radio(
+    "Navigation Tabs",
+    options=tab_labels,
+    key="nav_tab",
+    horizontal=True,
+    label_visibility="collapsed"
+)
 
 # =============================================================================
 # TAB 1: CALENDAR
 # =============================================================================
-with tab_cal:
+if selected_tab.startswith("📅"):
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     json_data = json.dumps(live_data)
 
@@ -656,117 +653,109 @@ with tab_cal:
 # =============================================================================
 # TAB 2: FOCUS VIEW
 # =============================================================================
-with tab_focus:
+elif selected_tab.startswith("🔍"):
     live_data = fetch_calendar_data(CALENDAR_DATA_URL, RAW_DATA_URL)
     
-    if not focus_date_str:
-        st.markdown("""
-        <div class="cashflow-card" style="text-align: center; padding: 40px;">
-            <div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No Date Selected</div>
-            <div style="font-size: 13px; color: #94a3b8;">Go to the <b>Calendar & Schedule</b> tab and <b>double-click</b> any date cell on the grid to jump straight here with full details loaded.</div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        try:
-            sel_dt = datetime.datetime.strptime(focus_date_str, "%Y-%m-%d").date()
-            sel_formatted = sel_dt.strftime("%A, %B %d, %Y")
-        except:
-            sel_dt = datetime.date.today()
-            sel_formatted = sel_dt.strftime("%A, %B %d, %Y")
+    try:
+        sel_dt = datetime.datetime.strptime(focus_date_str, "%Y-%m-%d").date()
+        sel_formatted = sel_dt.strftime("%A, %B %d, %Y")
+    except:
+        sel_dt = datetime.date.today()
+        sel_formatted = sel_dt.strftime("%A, %B %d, %Y")
 
-        st.markdown(f"<div class='section-header' style='margin-top:10px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
-        
-        curr_data = live_data.get(focus_date_str, {"events": [], "bills": [], "status": "Working"})
-        col_d1, col_d2 = st.columns(2)
-        
-        with col_d1:
-            st.markdown("<div style='font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 6px;'>📅 Today's Events</div>", unsafe_allow_html=True)
-            if curr_data["events"]:
-                for ev in curr_data["events"]:
-                    st.markdown(f"""
-                    <div class="data-card">
-                        <div style="color:#fff; font-weight:600; font-size: 12px;">{ev['title']}</div>
-                        {f"<div style='font-size:11px; color:#38bdf8;'>⏰ {ev['time']} | 📍 {ev['location']}</div>" if (ev['time'] or ev['location']) else ""}
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No events scheduled for today.</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header' style='margin-top:10px;'>🎯 Deep Dive: {sel_formatted}</div>", unsafe_allow_html=True)
+    
+    curr_data = live_data.get(focus_date_str, {"events": [], "bills": [], "status": "Working"})
+    col_d1, col_d2 = st.columns(2)
+    
+    with col_d1:
+        st.markdown("<div style='font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 6px;'>📅 Today's Events</div>", unsafe_allow_html=True)
+        if curr_data["events"]:
+            for ev in curr_data["events"]:
+                st.markdown(f"""
+                <div class="data-card">
+                    <div style="color:#fff; font-weight:600; font-size: 12px;">{ev['title']}</div>
+                    {f"<div style='font-size:11px; color:#38bdf8;'>⏰ {ev['time']} | 📍 {ev['location']}</div>" if (ev['time'] or ev['location']) else ""}
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No events scheduled for today.</div>", unsafe_allow_html=True)
 
-        with col_d2:
-            st.markdown("<div style='font-size: 13px; font-weight: 700; color: #facc15; margin-bottom: 6px;'>💸 Today's Bills</div>", unsafe_allow_html=True)
-            if curr_data["bills"]:
-                for b in curr_data["bills"]:
-                    st.markdown(f"""
-                    <div class="data-card bill-card">
-                        <div style="color:#fff; font-weight:600; font-size: 12px;">{b['title']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No bills due today.</div>", unsafe_allow_html=True)
+    with col_d2:
+        st.markdown("<div style='font-size: 13px; font-weight: 700; color: #facc15; margin-bottom: 6px;'>💸 Today's Bills</div>", unsafe_allow_html=True)
+        if curr_data["bills"]:
+            for b in curr_data["bills"]:
+                st.markdown(f"""
+                <div class="data-card bill-card">
+                    <div style="color:#fff; font-weight:600; font-size: 12px;">{b['title']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='cashflow-card' style='color:#64748b; font-size:12px;'>No bills due today.</div>", unsafe_allow_html=True)
 
-        st.markdown("<div class='section-header' style='margin-top:24px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
-        week_cols = st.columns(7)
+    st.markdown("<div class='section-header' style='margin-top:24px;'>⚡ Upcoming Week (Next 7 Days)</div>", unsafe_allow_html=True)
+    week_cols = st.columns(7)
+    
+    for i in range(1, 8):
+        future_dt = sel_dt + datetime.timedelta(days=i)
+        f_key = future_dt.strftime("%Y-%m-%d")
+        f_data = live_data.get(f_key, {"events": [], "bills": []})
+        f_label = future_dt.strftime("%a<br>%b %d")
         
+        with week_cols[i-1]:
+            ev_count = len(f_data["events"])
+            bill_count = len(f_data["bills"])
+            st.markdown(f"""
+            <div class="metric-card" style="padding: 8px; min-height: 90px; text-align: left;">
+                <div style="font-size: 10px; font-weight: 700; color: #38bdf8; border-bottom: 1px solid #222734; padding-bottom: 3px; margin-bottom: 4px;">{f_label}</div>
+                <div style="font-size: 11px; color: {'#4ade80' if ev_count > 0 else '#64748b'};">🗓️ {ev_count} event{"" if ev_count == 1 else "s"}</div>
+                <div style="font-size: 11px; color: {'#facc15' if bill_count > 0 else '#64748b'};">💸 {bill_count} bill{"" if bill_count == 1 else "s"}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with st.expander("🔍 View Detailed Schedule for Next 7 Days"):
         for i in range(1, 8):
             future_dt = sel_dt + datetime.timedelta(days=i)
             f_key = future_dt.strftime("%Y-%m-%d")
             f_data = live_data.get(f_key, {"events": [], "bills": []})
-            f_label = future_dt.strftime("%a<br>%b %d")
-            
-            with week_cols[i-1]:
-                ev_count = len(f_data["events"])
-                bill_count = len(f_data["bills"])
-                st.markdown(f"""
-                <div class="metric-card" style="padding: 8px; min-height: 90px; text-align: left;">
-                    <div style="font-size: 10px; font-weight: 700; color: #38bdf8; border-bottom: 1px solid #222734; padding-bottom: 3px; margin-bottom: 4px;">{f_label}</div>
-                    <div style="font-size: 11px; color: {'#4ade80' if ev_count > 0 else '#64748b'};">🗓️ {ev_count} event{"" if ev_count == 1 else "s"}</div>
-                    <div style="font-size: 11px; color: {'#facc15' if bill_count > 0 else '#64748b'};">💸 {bill_count} bill{"" if bill_count == 1 else "s"}</div>
-                </div>
-                """, unsafe_allow_html=True)
+            if f_data["events"] or f_data["bills"]:
+                st.markdown(f"<b style='color:#f8fafc; font-size:12px;'>{future_dt.strftime('%A, %b %d')}:</b>", unsafe_allow_html=True)
+                for ev in f_data["events"]:
+                    st.markdown(f"<span style='color:#38bdf8; font-size:11px; margin-left:10px;'>• Event: {ev['title']}</span>", unsafe_allow_html=True)
+                for b in f_data["bills"]:
+                    st.markdown(f"<span style='color:#facc15; font-size:11px; margin-left:10px;'>• Bill: {b['title']}</span>", unsafe_allow_html=True)
 
-        with st.expander("🔍 View Detailed Schedule for Next 7 Days"):
-            for i in range(1, 8):
-                future_dt = sel_dt + datetime.timedelta(days=i)
-                f_key = future_dt.strftime("%Y-%m-%d")
-                f_data = live_data.get(f_key, {"events": [], "bills": []})
-                if f_data["events"] or f_data["bills"]:
-                    st.markdown(f"<b style='color:#f8fafc; font-size:12px;'>{future_dt.strftime('%A, %b %d')}:</b>", unsafe_allow_html=True)
-                    for ev in f_data["events"]:
-                        st.markdown(f"<span style='color:#38bdf8; font-size:11px; margin-left:10px;'>• Event: {ev['title']}</span>", unsafe_allow_html=True)
-                    for b in f_data["bills"]:
-                        st.markdown(f"<span style='color:#facc15; font-size:11px; margin-left:10px;'>• Bill: {b['title']}</span>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header' style='margin-top:24px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
+    
+    month_events_summary = []
+    for i in range(8, 38):
+        m_dt = sel_dt + datetime.timedelta(days=i)
+        m_key = m_dt.strftime("%Y-%m-%d")
+        m_data = live_data.get(m_key)
+        if m_data and (m_data["events"] or m_data["bills"]):
+            titles = [e['title'] for e in m_data["events"]] + [b['title'] for b in m_data["bills"]]
+            month_events_summary.append({
+                "date": m_dt.strftime("%b %d (%a)"),
+                "items": ", ".join(titles)
+            })
 
-        st.markdown("<div class='section-header' style='margin-top:24px;'>📅 Next Month Overview (Days 8 to 37)</div>", unsafe_allow_html=True)
-        
-        month_events_summary = []
-        for i in range(8, 38):
-            m_dt = sel_dt + datetime.timedelta(days=i)
-            m_key = m_dt.strftime("%Y-%m-%d")
-            m_data = live_data.get(m_key)
-            if m_data and (m_data["events"] or m_data["bills"]):
-                titles = [e['title'] for e in m_data["events"]] + [b['title'] for b in m_data["bills"]]
-                month_events_summary.append({
-                    "date": m_dt.strftime("%b %d (%a)"),
-                    "items": ", ".join(titles)
-                })
-
-        if month_events_summary:
-            summary_rows = "".join([
-                f'''<div class="cf-row">
-                    <span style="color:#38bdf8; font-weight:600; width: 110px; flex-shrink: 0;">{item["date"]}</span>
-                    <span style="color:#cbd5e1; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{item["items"]}</span>
-                </div>'''
-                for item in month_events_summary
-            ])
-            st.markdown(f'<div class="cashflow-card" style="max-height: 180px; overflow-y: auto;">{summary_rows}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
+    if month_events_summary:
+        summary_rows = "".join([
+            f'''<div class="cf-row">
+                <span style="color:#38bdf8; font-weight:600; width: 110px; flex-shrink: 0;">{item["date"]}</span>
+                <span style="color:#cbd5e1; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{item["items"]}</span>
+            </div>'''
+            for item in month_events_summary
+        ])
+        st.markdown(f'<div class="cashflow-card" style="max-height: 180px; overflow-y: auto;">{summary_rows}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="cashflow-card" style="color:#64748b; font-size:12px;">No recorded events or bills in the subsequent 30-day window.</div>', unsafe_allow_html=True)
 
 
 # =============================================================================
 # TAB 3: FINANCIAL DASHBOARD
 # =============================================================================
-with tab_fin:
+elif selected_tab.startswith("💰"):
     fin = fetch_finances_data(FINANCES_URL)
 
     if fin:
