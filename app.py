@@ -998,7 +998,7 @@ elif current_tab == "Finances":
                 st.markdown("<hr style='border-color: #222734; margin: 8px 0;'>", unsafe_allow_html=True)
                 
                 updated_goals.append({
-                    "index": goal.get("index", 14 + i),
+                    "index": goal.get("index", 15 + i),
                     "name": new_name, "current": new_bal, "target": new_target,
                     "start_date": new_start, "end_date": new_end, "rate": live_rate,
                     "is_new": goal.get("is_new", False)
@@ -1030,25 +1030,31 @@ elif current_tab == "Finances":
                             client = authenticate_gspread()
                             sheet = client.open_by_key(SHEET_ID).worksheet("Finances")
                             
-                            # Calculate active target rows dynamically based on existing list length
-                            base_rate_row = 15
-                            base_transfer_row = 27
-                            
+                            # Determine the row index of the last existing goal dynamically
+                            existing_indices = [g["index"] for g in fin["goals"] if not g.get("is_new", False)]
+                            last_rate_row = max(existing_indices) if existing_indices else 19
+                            last_transfer_row = 31 # Account Transfers last row in current setup
+
+                            new_offset_rate = 0
+                            new_offset_transfer = 0
+
                             for idx, ug in enumerate(updated_goals):
                                 if ug.get("is_new", False):
-                                    # Insert dynamically right after the current last goal
-                                    target_rate_row = base_rate_row + idx
-                                    target_transfer_row = base_transfer_row + idx
-                                    
-                                    # Write values leaving the formula column (P) blank so sheet formulas apply naturally
-                                    sheet.update(f'K{target_rate_row}:Q{target_rate_row}', [[ug["name"], ug["target"], "", ug["end_date"], ug["start_date"], ""]], value_input_option='USER_ENTERED')
-                                    sheet.update(f'B{target_transfer_row}:H{target_transfer_row}', [[ug["current"], ug["name"], "", "Balance after", 0, "weeks"]], value_input_option='USER_ENTERED')
+                                    # Dynamically insert right after the last goal row (Row 20 for first new goal)
+                                    target_rate_row = last_rate_row + 1 + new_offset_rate
+                                    sheet.insert_row(["", ug["name"], "", ug["target"], "", ug["end_date"], ug["start_date"], "", ""], index=target_rate_row)
+                                    new_offset_rate += 1
+
+                                    # Insert into Account Transfers table right below last transfer row (Row 32 for first new goal)
+                                    target_transfer_row = last_transfer_row + 1 + new_offset_transfer
+                                    sheet.insert_row([ug["current"], ug["name"], "", "Balance after", 0, "weeks", ""], index=target_transfer_row)
+                                    new_offset_transfer += 1
                                 else:
                                     row_idx = ug["index"] + 1
                                     sheet.update(f'K{row_idx}:L{row_idx}', [[ug["name"], ug["target"]]], value_input_option='USER_ENTERED')
                                     sheet.update(f'N{row_idx}:O{row_idx}', [[ug["end_date"], ug["start_date"]]], value_input_option='USER_ENTERED')
                                     
-                                    transfer_row = 27 + idx 
+                                    transfer_row = 28 + idx 
                                     sheet.update(f'B{transfer_row}:C{transfer_row}', [[ug["current"], ug["name"]]], value_input_option='USER_ENTERED')
                             
                             st.success("Successfully updated Google Sheets!")
