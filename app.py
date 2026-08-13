@@ -1000,7 +1000,8 @@ elif current_tab == "Finances":
                 updated_goals.append({
                     "index": goal.get("index", len(fin["goals"]) + i + 15),
                     "name": new_name, "current": new_bal, "target": new_target,
-                    "start_date": new_start, "end_date": new_end, "rate": live_rate
+                    "start_date": new_start, "end_date": new_end, "rate": live_rate,
+                    "is_new": goal.get("is_new", False)
                 })
             
             st.markdown(f"""
@@ -1015,7 +1016,10 @@ elif current_tab == "Finances":
                 if st.button("➕ Add New Goal", use_container_width=True):
                     st.session_state.edit_goals.append({
                         "name": "New Goal", "current": 0.0, "target": 1000.0, 
-                        "start_date": "", "end_date": "", "rate": 0.0
+                        "start_date": datetime.datetime.now().strftime("%d-%b-%Y"), 
+                        "end_date": (datetime.datetime.now() + datetime.timedelta(days=365)).strftime("%d-%b-%Y"), 
+                        "rate": 0.0,
+                        "is_new": True
                     })
                     st.rerun()
 
@@ -1028,16 +1032,35 @@ elif current_tab == "Finances":
                             
                             for idx, ug in enumerate(updated_goals):
                                 row_idx = ug["index"] + 1 
-                                sheet.update(f'K{row_idx}:L{row_idx}', [[ug["name"], ug["target"]]], value_input_option='USER_ENTERED')
-                                sheet.update(f'N{row_idx}:O{row_idx}', [[ug["end_date"], ug["start_date"]]], value_input_option='USER_ENTERED')
                                 
-                                transfer_row = 28 + idx 
-                                sheet.update(f'B{transfer_row}:C{transfer_row}', [[ug["current"], ug["name"]]], value_input_option='USER_ENTERED')
+                                if ug.get("is_new", False):
+                                    # 1. Insert row into Savings Rates table (Columns K to Q)
+                                    target_rate_row = 20 + idx
+                                    sheet.insert_row(["", ug["name"], "", ug["target"], "", ug["end_date"], ug["start_date"], "WAITING", ""], index=target_rate_row)
+                                    
+                                    source_fmt_range = f"K{target_rate_row-1}:Q{target_rate_row-1}"
+                                    dest_fmt_range = f"K{target_rate_row}:Q{target_rate_row}"
+                                    sheet.copy_paste(source_fmt_range, dest_fmt_range, paste_type='PASTE_NORMAL')
+
+                                    # 2. Insert row into Account Transfers table (Columns B to G)
+                                    target_transfer_row = 32 + idx
+                                    sheet.insert_row([ug["current"], ug["name"], "", "Balance after", 0, "weeks", 0.0], index=target_transfer_row)
+                                    
+                                    source_t_range = f"B{target_transfer_row-1}:G{target_transfer_row-1}"
+                                    dest_t_range = f"B{target_transfer_row}:G{target_transfer_row}"
+                                    sheet.copy_paste(source_t_range, dest_t_range, paste_type='PASTE_NORMAL')
+                                else:
+                                    sheet.update(f'K{row_idx}:L{row_idx}', [[ug["name"], ug["target"]]], value_input_option='USER_ENTERED')
+                                    sheet.update(f'N{row_idx}:O{row_idx}', [[ug["end_date"], ug["start_date"]]], value_input_option='USER_ENTERED')
+                                    
+                                    transfer_row = 28 + idx 
+                                    sheet.update(f'B{transfer_row}:C{transfer_row}', [[ug["current"], ug["name"]]], value_input_option='USER_ENTERED')
                             
                             st.success("Successfully updated Google Sheets!")
                             st.cache_data.clear() 
+                            st.rerun()
                             
                         except Exception as e:
-                            st.error(f"Failed to update sheet. Please ensure credentials are correct. Error: {e}")
+                            st.error(f"Failed to update sheet. Error: {e}")
     else:
         st.warning("Unable to fetch financial data from Google Sheets.")
