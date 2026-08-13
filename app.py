@@ -985,7 +985,7 @@ elif current_tab == "Finances":
                 with col2:
                     new_bal = st.number_input("Current Balance", value=float(goal["current"]), key=f"bal_{i}")
                 with col3:
-                    new_target = st.number_input("Target ($)", value=float(goal["target"],  key=f"target_{i}" if 'target_' in locals() else f"target_{i}")) # handled cleanly
+                    new_target = st.number_input("Target ($)", value=float(goal["target"]), key=f"target_{i}")
                 with col4:
                     new_start = st.text_input("Start Date (DD-Mon-YYYY)", value=goal["start_date"], key=f"start_{i}")
                 with col5:
@@ -1036,10 +1036,9 @@ elif current_tab == "Finances":
                                 if ug.get("is_new", False):
                                     # 1. Savings Rates Table: Insert row directly into columns K to Q at row 20 + idx
                                     target_rate_row = 20 + idx
-                                    # Ensure we insert into the correct range without messing up columns A-J
                                     sheet.update(f'K{target_rate_row}:Q{target_rate_row}', [[ug["name"], ug["target"], "", ug["end_date"], ug["start_date"], "WAITING"]], value_input_option='USER_ENTERED')
                                     
-                                    # 2. Account Transfers Table: Insert into columns C to H at row 32 + idx
+                                    # 2. Account Transfers Table: Insert into columns B to H at row 32 + idx
                                     target_transfer_row = 32 + idx
                                     sheet.update(f'B{target_transfer_row}:H{target_transfer_row}', [[ug["current"], ug["name"], "", "Balance after", 0, "weeks", 0.0]], value_input_option='USER_ENTERED')
                                 else:
