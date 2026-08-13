@@ -14,7 +14,6 @@ RAW_DATA_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX
 FINANCES_URL = "https://docs.google.com/spreadsheets/d/1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI/export?format=csv&gid=1688426207"
 SHEET_ID = "1ilr62jlHutXMTJScGlJ92dpX2O6CFtPkKRlQRDZbrhI"
 
-# Authentication for editing the sheet via Streamlit Secrets
 def authenticate_gspread():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     credentials_dict = dict(st.secrets["gcp_service_account"])
@@ -297,10 +296,11 @@ def fetch_finances_data(finances_url):
             if name_val and name_val.lower() != 'nan':
                 transfer_balance_mapping[name_val] = {"row": r, "balance": clean_num(df.iloc[r, 1])}
 
-    for r in range(15, 25):
+    for r in range(14, 25):
         try:
             g_name = str(df.iloc[r, 10]).strip() # Column K (Goal Name)
             if not g_name or g_name.lower() == 'nan': continue
+            if "savings by" in g_name.lower(): continue # Skip header/calculation rows
             
             target_val = clean_num(df.iloc[r, 11]) # Column L (Target Amount)
             end_date = str(df.iloc[r, 13]).strip() if pd.notna(df.iloc[r, 13]) else "" # Column N (End Date)
@@ -998,7 +998,7 @@ elif current_tab == "Finances":
                 st.markdown("<hr style='border-color: #222734; margin: 8px 0;'>", unsafe_allow_html=True)
                 
                 updated_goals.append({
-                    "index": goal.get("index", len(fin["goals"]) + i + 15),
+                    "index": goal.get("index", 14 + i),
                     "name": new_name, "current": new_bal, "target": new_target,
                     "start_date": new_start, "end_date": new_end, "rate": live_rate,
                     "is_new": goal.get("is_new", False)
@@ -1030,22 +1030,25 @@ elif current_tab == "Finances":
                             client = authenticate_gspread()
                             sheet = client.open_by_key(SHEET_ID).worksheet("Finances")
                             
+                            # Calculate active target rows dynamically based on existing list length
+                            base_rate_row = 15
+                            base_transfer_row = 27
+                            
                             for idx, ug in enumerate(updated_goals):
-                                row_idx = ug["index"] + 1 
-                                
                                 if ug.get("is_new", False):
-                                    # 1. Savings Rates Table: Insert row directly into columns K to Q at row 20 + idx
-                                    target_rate_row = 20 + idx
-                                    sheet.update(f'K{target_rate_row}:Q{target_rate_row}', [[ug["name"], ug["target"], "", ug["end_date"], ug["start_date"], "WAITING"]], value_input_option='USER_ENTERED')
+                                    # Insert dynamically right after the current last goal
+                                    target_rate_row = base_rate_row + idx
+                                    target_transfer_row = base_transfer_row + idx
                                     
-                                    # 2. Account Transfers Table: Insert into columns B to H at row 32 + idx
-                                    target_transfer_row = 32 + idx
-                                    sheet.update(f'B{target_transfer_row}:H{target_transfer_row}', [[ug["current"], ug["name"], "", "Balance after", 0, "weeks", 0.0]], value_input_option='USER_ENTERED')
+                                    # Write values leaving the formula column (P) blank so sheet formulas apply naturally
+                                    sheet.update(f'K{target_rate_row}:Q{target_rate_row}', [[ug["name"], ug["target"], "", ug["end_date"], ug["start_date"], ""]], value_input_option='USER_ENTERED')
+                                    sheet.update(f'B{target_transfer_row}:H{target_transfer_row}', [[ug["current"], ug["name"], "", "Balance after", 0, "weeks"]], value_input_option='USER_ENTERED')
                                 else:
+                                    row_idx = ug["index"] + 1
                                     sheet.update(f'K{row_idx}:L{row_idx}', [[ug["name"], ug["target"]]], value_input_option='USER_ENTERED')
                                     sheet.update(f'N{row_idx}:O{row_idx}', [[ug["end_date"], ug["start_date"]]], value_input_option='USER_ENTERED')
                                     
-                                    transfer_row = 28 + idx 
+                                    transfer_row = 27 + idx 
                                     sheet.update(f'B{transfer_row}:C{transfer_row}', [[ug["current"], ug["name"]]], value_input_option='USER_ENTERED')
                             
                             st.success("Successfully updated Google Sheets!")
