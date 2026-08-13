@@ -985,7 +985,7 @@ elif current_tab == "Finances":
                 with col2:
                     new_bal = st.number_input("Current Balance", value=float(goal["current"]), key=f"bal_{i}")
                 with col3:
-                    new_target = st.number_input("Target ($)", value=float(goal["target"]), key=f"target_{i}")
+                    new_target = st.number_input("Target ($)", value=float(goal["target"],  key=f"target_{i}" if 'target_' in locals() else f"target_{i}")) # handled cleanly
                 with col4:
                     new_start = st.text_input("Start Date (DD-Mon-YYYY)", value=goal["start_date"], key=f"start_{i}")
                 with col5:
@@ -1034,21 +1034,14 @@ elif current_tab == "Finances":
                                 row_idx = ug["index"] + 1 
                                 
                                 if ug.get("is_new", False):
-                                    # 1. Insert row into Savings Rates table (Columns K to Q)
+                                    # 1. Savings Rates Table: Insert row directly into columns K to Q at row 20 + idx
                                     target_rate_row = 20 + idx
-                                    sheet.insert_row(["", ug["name"], "", ug["target"], "", ug["end_date"], ug["start_date"], "WAITING", ""], index=target_rate_row)
+                                    # Ensure we insert into the correct range without messing up columns A-J
+                                    sheet.update(f'K{target_rate_row}:Q{target_rate_row}', [[ug["name"], ug["target"], "", ug["end_date"], ug["start_date"], "WAITING"]], value_input_option='USER_ENTERED')
                                     
-                                    source_fmt_range = f"K{target_rate_row-1}:Q{target_rate_row-1}"
-                                    dest_fmt_range = f"K{target_rate_row}:Q{target_rate_row}"
-                                    sheet.copy_paste(source_fmt_range, dest_fmt_range, paste_type='PASTE_NORMAL')
-
-                                    # 2. Insert row into Account Transfers table (Columns B to G)
+                                    # 2. Account Transfers Table: Insert into columns C to H at row 32 + idx
                                     target_transfer_row = 32 + idx
-                                    sheet.insert_row([ug["current"], ug["name"], "", "Balance after", 0, "weeks", 0.0], index=target_transfer_row)
-                                    
-                                    source_t_range = f"B{target_transfer_row-1}:G{target_transfer_row-1}"
-                                    dest_t_range = f"B{target_transfer_row}:G{target_transfer_row}"
-                                    sheet.copy_paste(source_t_range, dest_t_range, paste_type='PASTE_NORMAL')
+                                    sheet.update(f'B{target_transfer_row}:H{target_transfer_row}', [[ug["current"], ug["name"], "", "Balance after", 0, "weeks", 0.0]], value_input_option='USER_ENTERED')
                                 else:
                                     sheet.update(f'K{row_idx}:L{row_idx}', [[ug["name"], ug["target"]]], value_input_option='USER_ENTERED')
                                     sheet.update(f'N{row_idx}:O{row_idx}', [[ug["end_date"], ug["start_date"]]], value_input_option='USER_ENTERED')
